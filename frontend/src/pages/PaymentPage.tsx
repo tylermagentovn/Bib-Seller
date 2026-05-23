@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type PaymentResponse } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
-import { Loader2, Clock, CheckCircle } from "lucide-react";
+import { Loader2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 
