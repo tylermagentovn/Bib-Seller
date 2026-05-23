@@ -32,6 +32,7 @@ export interface Distance {
   maxSlots: number;
   bibStart: number;
   bibEnd: number;
+  _count?: { registrations: number };
 }
 
 export interface Event {

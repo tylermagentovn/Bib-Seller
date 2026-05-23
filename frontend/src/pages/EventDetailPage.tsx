@@ -58,17 +58,13 @@ export function EventDetailPage() {
         <meta name="twitter:description" content={pageDescription} />
         <meta name="twitter:image" content={pageImage} />
       </Helmet>
-      {/* Hero image */}
-      <div className="relative h-72 md:h-96 bg-gradient-to-br from-indigo-600 to-violet-700">
-        {event.imageUrl && (
-          <img src={event.imageUrl} alt={event.name} className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-50" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 max-w-4xl mx-auto">
+      {/* Hero */}
+      <div className="bg-gradient-to-br from-indigo-600 to-violet-700 px-6 py-8 md:py-10">
+        <div className="max-w-4xl mx-auto">
           <Badge variant="default" className="mb-3 bg-white/20 text-white border-white/30">
             {event.status === "PUBLISHED" ? "Đang mở đăng ký" : event.status}
           </Badge>
-          <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight">{event.name}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">{event.name}</h1>
         </div>
       </div>
 

@@ -23,16 +23,21 @@ const queryClient = new QueryClient({
 
 function PublicLayout() {
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       <Navbar />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/events/:slug" element={<EventDetailPage />} />
-        <Route path="/events/:slug/register" element={<RegisterPage />} />
-        <Route path="/payment/:id" element={<PaymentPage />} />
-        <Route path="/payment/:id/success" element={<PaymentSuccessPage />} />
-      </Routes>
-    </>
+      <div className="flex-1">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/events/:slug" element={<EventDetailPage />} />
+          <Route path="/events/:slug/register" element={<RegisterPage />} />
+          <Route path="/payment/:id" element={<PaymentPage />} />
+          <Route path="/payment/:id/success" element={<PaymentSuccessPage />} />
+        </Routes>
+      </div>
+      <footer className="bg-white border-t py-4 text-center text-xs text-gray-400">
+        Copyright by Song Ngu Team 2026
+      </footer>
+    </div>
   );
 }
 

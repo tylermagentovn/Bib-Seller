@@ -7,11 +7,15 @@ import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
+const distanceWithCount = {
+  include: { _count: { select: { registrations: true } } },
+};
+
 // Public: list published events
 router.get("/", async (_req: Request, res: Response) => {
   const events = await prisma.event.findMany({
     where: { status: "PUBLISHED" },
-    include: { distances: true },
+    include: { distances: distanceWithCount },
     orderBy: { eventDate: "asc" },
   });
   res.json(events);
@@ -21,7 +25,7 @@ router.get("/", async (_req: Request, res: Response) => {
 router.get("/:slug", async (req: Request, res: Response) => {
   const event = await prisma.event.findUnique({
     where: { slug: req.params.slug as string },
-    include: { distances: true },
+    include: { distances: distanceWithCount },
   });
   if (!event) {
     res.status(404).json({ error: "Event not found" });

@@ -97,11 +97,15 @@ export function RegisterPage() {
                   <SelectValue placeholder="Chọn cự ly tham gia" />
                 </SelectTrigger>
                 <SelectContent>
-                  {event.distances.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name} — {formatCurrency(d.price)}
-                    </SelectItem>
-                  ))}
+                  {event.distances.map((d) => {
+                    const isFull = (d._count?.registrations ?? 0) >= d.maxSlots;
+                    return (
+                      <SelectItem key={d.id} value={d.id} disabled={isFull}>
+                        {d.name} — {formatCurrency(d.price)}
+                        {isFull && <span className="ml-2 text-xs text-red-400">Đã hết slot</span>}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               {errors.distanceId && <p className="text-xs text-red-500">{errors.distanceId.message}</p>}
