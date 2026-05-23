@@ -25,13 +25,13 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
   }
 
   if (payment.status !== "PENDING") {
-    res.json({ payment, checkoutUrl: payment.checkoutUrl });
+    res.json({ payment, checkoutUrl: payment.checkoutUrl, qrCode: payment.qrCode });
     return;
   }
 
-  // Return cached checkout URL if already created
+  // Return cached data if already created
   if (payment.checkoutUrl && payment.payosOrderCode) {
-    res.json({ payment, checkoutUrl: payment.checkoutUrl });
+    res.json({ payment, checkoutUrl: payment.checkoutUrl, qrCode: payment.qrCode });
     return;
   }
 
@@ -44,19 +44,22 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
     orderCode,
     amount: payment.amount,
     description,
-    returnUrl: `${frontendUrl}/payment/${registrationId}/success`,
+    returnUrl: `${frontendUrl}/payment/${registrationId}/success?code=00`,
     cancelUrl: `${frontendUrl}/payment/${registrationId}`,
   });
+
+  const qrCode = (payosRes as any).qrCode as string | undefined;
 
   await prisma.payment.update({
     where: { id: payment.id },
     data: {
       payosOrderCode: String(orderCode),
       checkoutUrl: payosRes.checkoutUrl,
+      qrCode: qrCode ?? null,
     },
   });
 
-  res.json({ payment, checkoutUrl: payosRes.checkoutUrl });
+  res.json({ payment, checkoutUrl: payosRes.checkoutUrl, qrCode: qrCode ?? null });
 });
 
 // PayOS webhook

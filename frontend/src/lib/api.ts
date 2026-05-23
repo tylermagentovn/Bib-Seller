@@ -72,9 +72,16 @@ export interface Payment {
   amount: number;
   payosOrderCode: string | null;
   checkoutUrl: string | null;
+  qrCode: string | null;
   payosRef: string | null;
   status: "PENDING" | "PAID" | "EXPIRED";
   paidAt: string | null;
   expiresAt: string;
   createdAt: string;
+}
+
+export interface PaymentResponse {
+  payment: Payment;
+  checkoutUrl: string | null;
+  qrCode: string | null;
 }
