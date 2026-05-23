@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Event {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  description String
+  rules       String?
+  imageUrl    String?
+  location    String?
+  eventDate   DateTime?
+  status      EventStatus @default(DRAFT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  distances     Distance[]
+  registrations Registration[]
+}
+
+model Distance {
+  id       String @id @default(cuid())
+  eventId  String
+  name     String
+  price    Int
+  maxSlots Int
+  bibStart Int
+  bibEnd   Int
+
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrations Registration[]
+
+  @@index([eventId])
+}
+
+model Registration {
+  id             String             @id @default(cuid())
+  eventId        String
+  distanceId     String
+  fullName       String
+  phone          String
+  email          String
+  dob            DateTime
+  emergencyName  String
+  emergencyPhone String
+  bibNumber      Int?
+  status         RegistrationStatus @default(PENDING)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  event    Event    @relation(fields: [eventId], references: [id])
+  distance Distance @relation(fields: [distanceId], references: [id])
+  payment  Payment?
+
+  @@index([eventId])
+  @@index([distanceId])
+  @@index([email])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  registrationId String        @unique
+  amount         Int
+  sepayRef       String?       @unique
+  status         PaymentStatus @default(PENDING)
+  paidAt         DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime      @default(now())
+
+  registration Registration @relation(fields: [registrationId], references: [id])
+
+  @@index([sepayRef])
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum RegistrationStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  EXPIRED
+}

@@ -1,0 +1,27 @@
+1. Tổng quan:
+Ứng dụng chạy trên web, tạo các sự kiện và bán Bib cho các sự kiện đó 1 cách đơn giản.
+Tích hợp thanh toán qua QR (dựa trên API của https://developer.sepay.vn/vi có chế độ Test và Live)
+Phong cách giao diện: Style hiện đại Ux ui clear cập nhật theo xu hướng mới, thiết kế phẳng (bạn có thể chọn 1 ux ui platform nào đó nổi tiếng để làm)
+
+2. Công Nghệ:
+- Sử dụng React JS + Vite và Node JS API cho backend
+- DB sử dụng Postgre
+
+3. Mô tả các chức năng:
+3.1 Người dùng:
+- Giao diện homepage list danh sách các sự kiện đang diễn ra.
+- Trang chi tiết sự kiện : Layout phù hợp dễ chuyển đổi bấm vào nút đăng kí. Có hình ảnh sự kiện, có thông tin chung, quy định.
+- Bấm vào nút đăng kí -> Chuyển đến trang đăng kí :
+Trong trang đăng kí sẽ có form : Họ tên, Số điện thoại, Email, Ngày tháng năm sinh, Cự ly (select dựa trên cấu hình sự kiện), Thông tin người liên hệ khẩn cấp,
+Checkbox xác nhận miễn trừ trách nhiệm, 
+-> Bấm đăng kí -> Lưu thông tin tới google sheet -> cũng như DB (lúc này trạng thái chưa thanh toán) -> Mã QR hiện -> người dùng quét mã thanh toán -> Detect thanh toán xong -> Màn hình hiện trang thanh toán thành Công
+
+- Trên trang thanh toán thành công : cho phép người dùng quay số BIB -> số bib sẽ random trong khoảng theo từng cự ly do Admin cấu hình
+ví dụ 21KM (801 -> 899) 42 KM(900 -> 999) , số đã cấp sẽ bị loại trừ lúc quay
+-> Sau khi người dùng vừa ý với số bib -> bấm xác nhận để hoàn tất -> Gửi Email thông tin toàn bộ đến khách hàng.
+
+
+3.2 Admin
+- Quản lý sự kiện :
++ Thêm, sử xóa sự kiện, cấu hình cho sự kiện : Tên, hình ảnh, thông tin, cự ly (tên, giá của cự ly), cấu hình cấp số bib cho từng cự ly, Số lượng Max cho đăng kí.
++ Quản lý đăng kí : danh sách người dùng đã đăng kí, trạng thái đã thanh toán hoặc chưa. sửa số bib thủ công.
