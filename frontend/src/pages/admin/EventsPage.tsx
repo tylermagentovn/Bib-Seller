@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Pencil, Trash2, X, Loader2, Calendar, MapPin } from "lucide-react";
 
 const distanceSchema = z.object({
+  id: z.string().optional(),
   name: z.string().min(1, "Bắt buộc"),
   price: z.number().positive("Phải > 0"),
   maxSlots: z.number().int().positive("Phải > 0"),
@@ -68,6 +69,7 @@ export function AdminEventsPage() {
       eventDate: event.eventDate ? event.eventDate.slice(0, 10) : "",
       status: event.status,
       distances: event.distances.map((d) => ({
+        id: d.id,
         name: d.name,
         price: d.price,
         maxSlots: d.maxSlots,
