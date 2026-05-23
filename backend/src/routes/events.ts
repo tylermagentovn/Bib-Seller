@@ -8,7 +8,7 @@ import { requireAuth } from "../middleware/auth";
 const router = Router();
 
 const distanceWithCount = {
-  include: { _count: { select: { registrations: true } } },
+  include: { _count: { select: { registrations: { where: { status: "PAID" as const } } } } },
 };
 
 // Public: list published events
