@@ -7,6 +7,7 @@ module.exports = {
       instances: 1,
       autorestart: true,
       watch: false,
+      node_args: "--openssl-legacy-provider",
       env: {
         NODE_ENV: "production",
       },

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { api, type Event } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -36,8 +37,27 @@ export function EventDetailPage() {
     );
   }
 
+  const pageTitle = `${event.name} — Song Ngư Club`;
+  const pageDescription = event.description.slice(0, 160);
+  const pageImage = event.imageUrl || "https://songngu.info/banner.jpg";
+  const pageUrl = `https://songngu.info/events/${event.slug}`;
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDescription} />
+        <meta property="og:image" content={pageImage} />
+        <meta property="og:locale" content="vi_VN" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDescription} />
+        <meta name="twitter:image" content={pageImage} />
+      </Helmet>
       {/* Hero image */}
       <div className="relative h-72 md:h-96 bg-gradient-to-br from-indigo-600 to-violet-700">
         {event.imageUrl && (
