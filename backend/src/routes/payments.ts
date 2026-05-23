@@ -1,25 +1,8 @@
 import { Router, Request, Response } from "express";
 import { PayOS } from "@payos/node";
-import crypto from "crypto";
 import { prisma } from "../lib/prisma";
 import { sendConfirmationEmail } from "../services/email";
 import { updateBibInSheet } from "../services/sheets";
-
-function verifyPayosSignature(body: any): boolean {
-  try {
-    const { data, signature } = body;
-    if (!data || !signature) return false;
-    const sortedKeys = Object.keys(data).sort();
-    const signData = sortedKeys.map((k) => `${k}=${data[k]}`).join("&");
-    const expected = crypto
-      .createHmac("sha256", process.env.PAYOS_CHECKSUM_KEY!)
-      .update(signData)
-      .digest("hex");
-    return expected === signature;
-  } catch {
-    return false;
-  }
-}
 
 const payos = new PayOS({
   clientId: process.env.PAYOS_CLIENT_ID!,
@@ -82,23 +65,21 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
 // PayOS webhook
 router.post("/webhook/payos", async (req: Request, res: Response) => {
   try {
-    if (!verifyPayosSignature(req.body)) {
-      res.status(400).json({ success: false, error: "Invalid signature" });
-      return;
-    }
+    // verify() throws if signature is invalid, returns verified data if valid
+    const verified = await payos.webhooks.verify(req.body) as any;
 
-    const { code, data } = req.body as { code: string; data: Record<string, any> };
-
-    if (code !== "00") {
+    // code "00" means successful payment — check both outer body and verified data
+    const successCode = req.body?.code === "00" || verified?.code === "00";
+    if (!successCode) {
       res.json({ success: false, reason: "Not a success event" });
       return;
     }
 
+    const orderCode = String(verified?.orderCode ?? req.body?.data?.orderCode);
+    const reference = String(verified?.reference ?? verified?.orderCode ?? req.body?.data?.reference ?? orderCode);
+
     const payment = await prisma.payment.findFirst({
-      where: {
-        payosOrderCode: String(data.orderCode),
-        status: "PENDING",
-      },
+      where: { payosOrderCode: orderCode, status: "PENDING" },
       include: { registration: { include: { event: true, distance: true } } },
     });
 
@@ -110,11 +91,7 @@ router.post("/webhook/payos", async (req: Request, res: Response) => {
     await prisma.$transaction([
       prisma.payment.update({
         where: { id: payment.id },
-        data: {
-          status: "PAID",
-          paidAt: new Date(),
-          payosRef: String(data.reference ?? data.orderCode),
-        },
+        data: { status: "PAID", paidAt: new Date(), payosRef: reference },
       }),
       prisma.registration.update({
         where: { id: payment.registrationId },
