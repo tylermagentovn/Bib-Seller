@@ -1,8 +1,25 @@
 import { Router, Request, Response } from "express";
 import { PayOS } from "@payos/node";
+import crypto from "crypto";
 import { prisma } from "../lib/prisma";
 import { sendConfirmationEmail } from "../services/email";
 import { updateBibInSheet } from "../services/sheets";
+
+function verifyPayosSignature(body: any): boolean {
+  try {
+    const { data, signature } = body;
+    if (!data || !signature) return false;
+    const sortedKeys = Object.keys(data).sort();
+    const signData = sortedKeys.map((k) => `${k}=${data[k]}`).join("&");
+    const expected = crypto
+      .createHmac("sha256", process.env.PAYOS_CHECKSUM_KEY!)
+      .update(signData)
+      .digest("hex");
+    return expected === signature;
+  } catch {
+    return false;
+  }
+}
 
 const payos = new PayOS({
   clientId: process.env.PAYOS_CLIENT_ID!,
@@ -65,16 +82,21 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
 // PayOS webhook
 router.post("/webhook/payos", async (req: Request, res: Response) => {
   try {
-    const webhookData = payos.webhooks.verify(req.body);
+    if (!verifyPayosSignature(req.body)) {
+      res.status(400).json({ success: false, error: "Invalid signature" });
+      return;
+    }
 
-    if (!webhookData || webhookData.code !== "00") {
+    const { code, data } = req.body as { code: string; data: Record<string, any> };
+
+    if (code !== "00") {
       res.json({ success: false, reason: "Not a success event" });
       return;
     }
 
     const payment = await prisma.payment.findFirst({
       where: {
-        payosOrderCode: String(webhookData.orderCode),
+        payosOrderCode: String(data.orderCode),
         status: "PENDING",
       },
       include: { registration: { include: { event: true, distance: true } } },
@@ -91,7 +113,7 @@ router.post("/webhook/payos", async (req: Request, res: Response) => {
         data: {
           status: "PAID",
           paidAt: new Date(),
-          payosRef: String(webhookData.reference ?? webhookData.orderCode),
+          payosRef: String(data.reference ?? data.orderCode),
         },
       }),
       prisma.registration.update({
@@ -131,7 +153,7 @@ router.get("/bib/spin/:registrationId", async (req: Request, res: Response) => {
     select: { bibNumber: true },
   });
 
-  const assignedSet = new Set(assigned.map((r) => r.bibNumber));
+  const assignedSet = new Set(assigned.map((r: { bibNumber: number | null }) => r.bibNumber));
   const available: number[] = [];
   for (let i = bibStart; i <= bibEnd; i++) {
     if (!assignedSet.has(i)) available.push(i);
@@ -176,7 +198,7 @@ router.post("/bib/confirm/:registrationId", async (req: Request, res: Response) 
     return;
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx: any) => {
     const conflict = await tx.registration.findFirst({
       where: {
         distanceId,
