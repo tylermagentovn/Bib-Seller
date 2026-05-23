@@ -1,26 +1,35 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api, type Registration } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Trophy, Loader2, RefreshCw, CheckCircle } from "lucide-react";
+import { Waves, Loader2, RefreshCw, CheckCircle, XCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 const SPIN_DURATION = 2500;
 
 export function PaymentSuccessPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const [currentBib, setCurrentBib] = useState<number | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+
+  const isCancelled = searchParams.get("cancel") === "true";
+  const isSuccess = searchParams.get("code") === "00" && !isCancelled;
 
   const { data: registration, isLoading } = useQuery<Registration>({
     queryKey: ["registration", id],
     queryFn: () => api.get(`/registrations/${id}`).then((r) => r.data),
     enabled: !!id,
+    // Poll until PAID (webhook may arrive slightly after redirect)
+    refetchInterval: (query) => {
+      const reg = query.state.data;
+      if (isCancelled) return false;
+      return reg?.status === "PAID" ? false : 2000;
+    },
   });
 
-  // If BIB already assigned, show confirmed state
   useEffect(() => {
     if (registration?.bibNumber) {
       setCurrentBib(registration.bibNumber);
@@ -30,11 +39,8 @@ export function PaymentSuccessPage() {
 
   const spinMutation = useMutation({
     mutationFn: () => api.get(`/payments/bib/spin/${id}`).then((r) => r.data),
-    onMutate: () => {
-      setIsSpinning(true);
-    },
+    onMutate: () => setIsSpinning(true),
     onSuccess: (data: { bibNumber: number }) => {
-      // Animate BIB rolling
       const start = Date.now();
       const min = registration!.distance.bibStart;
       const max = registration!.distance.bibEnd;
@@ -56,15 +62,37 @@ export function PaymentSuccessPage() {
   const confirmMutation = useMutation({
     mutationFn: () =>
       api.post(`/payments/bib/confirm/${id}`, { bibNumber: currentBib }).then((r) => r.data),
-    onSuccess: () => {
-      setConfirmed(true);
-    },
+    onSuccess: () => setConfirmed(true),
   });
 
-  if (isLoading) {
+  // Cancelled payment
+  if (isCancelled) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-sm border p-8 max-w-sm w-full text-center">
+          <XCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Thanh toán bị hủy</h1>
+          <p className="text-gray-500 text-sm mb-6">Bạn đã hủy thanh toán. Đơn đăng ký vẫn còn hiệu lực cho đến khi hết hạn.</p>
+          <div className="flex flex-col gap-2">
+            <Button asChild>
+              <Link to={`/payment/${id}`}>Thanh toán lại</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/">Về trang chủ</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Waiting for payment confirmation (webhook not yet received)
+  if (isLoading || (isSuccess && registration?.status !== "PAID")) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <p className="text-gray-600 font-medium">Đang xác nhận thanh toán...</p>
+        <p className="text-gray-400 text-sm">Vui lòng chờ trong giây lát</p>
       </div>
     );
   }
@@ -74,7 +102,6 @@ export function PaymentSuccessPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-violet-50 py-10 px-4">
       <div className="max-w-md mx-auto">
-        {/* Success header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
             <CheckCircle className="h-8 w-8 text-green-600" />
@@ -85,7 +112,6 @@ export function PaymentSuccessPage() {
           </p>
         </div>
 
-        {/* Registration summary */}
         <div className="bg-white rounded-2xl shadow-sm border p-5 mb-6 space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-500">Sự kiện</span>
@@ -105,7 +131,6 @@ export function PaymentSuccessPage() {
           </div>
         </div>
 
-        {/* BIB spin box */}
         <div className="bg-white rounded-2xl shadow-sm border p-6 text-center">
           <div className="mb-2 text-sm font-medium text-gray-500 uppercase tracking-widest">Số BIB</div>
 
@@ -143,7 +168,7 @@ export function PaymentSuccessPage() {
                 ) : currentBib ? (
                   <><RefreshCw className="h-4 w-4" /> Quay lại</>
                 ) : (
-                  <><Trophy className="h-4 w-4" /> Quay số BIB</>
+                  <><Waves className="h-4 w-4" /> Quay số BIB</>
                 )}
               </Button>
 

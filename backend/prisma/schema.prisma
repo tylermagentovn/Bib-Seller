@@ -75,7 +75,9 @@ model Payment {
   id             String        @id @default(cuid())
   registrationId String        @unique
   amount         Int
-  sepayRef       String?       @unique
+  payosOrderCode String?       @unique
+  checkoutUrl    String?
+  payosRef       String?
   status         PaymentStatus @default(PENDING)
   paidAt         DateTime?
   expiresAt      DateTime
@@ -83,7 +85,7 @@ model Payment {
 
   registration Registration @relation(fields: [registrationId], references: [id])
 
-  @@index([sepayRef])
+  @@index([payosOrderCode])
 }
 
 enum EventStatus {

@@ -70,18 +70,11 @@ export interface Payment {
   id: string;
   registrationId: string;
   amount: number;
-  sepayRef: string | null;
+  payosOrderCode: string | null;
+  checkoutUrl: string | null;
+  payosRef: string | null;
   status: "PENDING" | "PAID" | "EXPIRED";
   paidAt: string | null;
   expiresAt: string;
   createdAt: string;
-}
-
-export interface QrData {
-  bankName: string;
-  accountNumber: string;
-  accountName: string;
-  amount: number;
-  description: string;
-  qrUrl: string;
 }

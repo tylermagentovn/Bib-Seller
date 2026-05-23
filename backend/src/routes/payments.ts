@@ -1,12 +1,18 @@
 import { Router, Request, Response } from "express";
-import crypto from "crypto";
+import { PayOS } from "@payos/node";
 import { prisma } from "../lib/prisma";
 import { sendConfirmationEmail } from "../services/email";
 import { updateBibInSheet } from "../services/sheets";
 
+const payos = new PayOS({
+  clientId: process.env.PAYOS_CLIENT_ID!,
+  apiKey: process.env.PAYOS_API_KEY!,
+  checksumKey: process.env.PAYOS_CHECKSUM_KEY!,
+});
+
 const router = Router();
 
-// Get payment info for a registration
+// Get payment info + create PayOS checkout link if needed
 router.get("/:registrationId", async (req: Request, res: Response) => {
   const registrationId = req.params.registrationId as string;
   const payment = await prisma.payment.findUnique({
@@ -18,84 +24,84 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
     return;
   }
 
-  // Build QR content based on SePay format
-  const description = `BIB${payment.registrationId.slice(-8).toUpperCase()}`;
-  const qrData = {
-    bankName: process.env.SEPAY_BANK_NAME,
-    accountNumber: process.env.SEPAY_BANK_ACCOUNT,
-    accountName: process.env.SEPAY_ACCOUNT_NAME,
+  if (payment.status !== "PENDING") {
+    res.json({ payment, checkoutUrl: payment.checkoutUrl });
+    return;
+  }
+
+  // Return cached checkout URL if already created
+  if (payment.checkoutUrl && payment.payosOrderCode) {
+    res.json({ payment, checkoutUrl: payment.checkoutUrl });
+    return;
+  }
+
+  // Create PayOS payment link
+  const orderCode = Date.now();
+  const description = `BIB${registrationId.slice(-6).toUpperCase()}`;
+  const frontendUrl = process.env.FRONTEND_URL ?? "https://songngu.info";
+
+  const payosRes = await payos.paymentRequests.create({
+    orderCode,
     amount: payment.amount,
     description,
-    qrUrl: `https://qr.sepay.vn/img?bank=${process.env.SEPAY_BANK_NAME}&acc=${process.env.SEPAY_BANK_ACCOUNT}&template=compact&amount=${payment.amount}&des=${description}`,
-  };
-
-  res.json({ payment, qrData });
-});
-
-// SePay webhook
-router.post("/webhook/sepay", async (req: Request, res: Response) => {
-  // Verify webhook secret
-  const signature = req.headers["x-sepay-signature"] as string;
-  if (process.env.SEPAY_WEBHOOK_SECRET && signature) {
-    const expected = crypto
-      .createHmac("sha256", process.env.SEPAY_WEBHOOK_SECRET)
-      .update(JSON.stringify(req.body))
-      .digest("hex");
-    if (signature !== expected) {
-      res.status(401).json({ error: "Invalid signature" });
-      return;
-    }
-  }
-
-  const { content, transferAmount, referenceCode } = req.body;
-  if (!content) {
-    res.json({ success: false });
-    return;
-  }
-
-  // Match payment by description pattern BIBxxxxxxxx
-  const match = content.match(/BIB([A-Z0-9]{8})/i);
-  if (!match) {
-    res.json({ success: false, reason: "No BIB code in content" });
-    return;
-  }
-
-  const shortId = match[1].toUpperCase();
-
-  // Find pending payment matching this short id
-  const payment = await prisma.payment.findFirst({
-    where: {
-      status: "PENDING",
-      registration: {
-        id: { endsWith: shortId.toLowerCase() },
-      },
-    },
-    include: { registration: { include: { event: true, distance: true } } },
+    returnUrl: `${frontendUrl}/payment/${registrationId}/success`,
+    cancelUrl: `${frontendUrl}/payment/${registrationId}`,
   });
 
-  if (!payment) {
-    res.json({ success: false, reason: "Payment not found or already processed" });
-    return;
+  await prisma.payment.update({
+    where: { id: payment.id },
+    data: {
+      payosOrderCode: String(orderCode),
+      checkoutUrl: payosRes.checkoutUrl,
+    },
+  });
+
+  res.json({ payment, checkoutUrl: payosRes.checkoutUrl });
+});
+
+// PayOS webhook
+router.post("/webhook/payos", async (req: Request, res: Response) => {
+  try {
+    const webhookData = payos.webhooks.verify(req.body);
+
+    if (!webhookData || webhookData.code !== "00") {
+      res.json({ success: false, reason: "Not a success event" });
+      return;
+    }
+
+    const payment = await prisma.payment.findFirst({
+      where: {
+        payosOrderCode: String(webhookData.orderCode),
+        status: "PENDING",
+      },
+      include: { registration: { include: { event: true, distance: true } } },
+    });
+
+    if (!payment) {
+      res.json({ success: false, reason: "Payment not found or already processed" });
+      return;
+    }
+
+    await prisma.$transaction([
+      prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: "PAID",
+          paidAt: new Date(),
+          payosRef: String(webhookData.reference ?? webhookData.orderCode),
+        },
+      }),
+      prisma.registration.update({
+        where: { id: payment.registrationId },
+        data: { status: "PAID" },
+      }),
+    ]);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("PayOS webhook error:", err);
+    res.status(400).json({ success: false, error: "Invalid webhook data" });
   }
-
-  // Validate amount
-  if (transferAmount < payment.amount) {
-    res.json({ success: false, reason: "Insufficient amount" });
-    return;
-  }
-
-  await prisma.$transaction([
-    prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: "PAID", paidAt: new Date(), sepayRef: referenceCode },
-    }),
-    prisma.registration.update({
-      where: { id: payment.registrationId },
-      data: { status: "PAID" },
-    }),
-  ]);
-
-  res.json({ success: true });
 });
 
 // BIB spin: get a random available BIB number
@@ -113,7 +119,6 @@ router.get("/bib/spin/:registrationId", async (req: Request, res: Response) => {
 
   const { bibStart, bibEnd, id: distanceId } = registration.distance;
 
-  // Get all assigned BIBs in this distance range
   const assigned = await prisma.registration.findMany({
     where: {
       distanceId,
@@ -168,7 +173,6 @@ router.post("/bib/confirm/:registrationId", async (req: Request, res: Response) 
     return;
   }
 
-  // Lock with transaction to prevent race condition
   const updated = await prisma.$transaction(async (tx) => {
     const conflict = await tx.registration.findFirst({
       where: {
@@ -186,7 +190,6 @@ router.post("/bib/confirm/:registrationId", async (req: Request, res: Response) 
     });
   });
 
-  // Send email + update sheet (fire-and-forget)
   sendConfirmationEmail({
     to: registration.email,
     fullName: registration.fullName,
