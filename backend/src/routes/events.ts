@@ -1,6 +1,8 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
@@ -41,6 +43,7 @@ router.get("/admin/all", requireAuth, async (_req: Request, res: Response) => {
 });
 
 const distanceSchema = z.object({
+  id: z.string().optional(),
   name: z.string().min(1),
   price: z.number().int().positive(),
   maxSlots: z.number().int().positive(),
@@ -88,19 +91,51 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
   }
 
   const { distances, ...eventData } = parsed.data;
-  const event = await prisma.event.update({
-    where: { id: req.params.id as string },
-    data: {
-      ...eventData,
-      eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
-      imageUrl: eventData.imageUrl || null,
-      distances: {
-        deleteMany: {},
-        create: distances,
-      },
-    },
-    include: { distances: true },
+  const eventId = req.params.id as string;
+
+  // Find distances being removed (existing but not in incoming list)
+  const existingDistances = await prisma.distance.findMany({
+    where: { eventId },
+    include: { _count: { select: { registrations: true } } },
   });
+  const incomingIds = new Set(distances.filter((d) => d.id).map((d) => d.id!));
+  const toDelete = existingDistances.filter((d) => !incomingIds.has(d.id));
+
+  if (toDelete.some((d) => d._count.registrations > 0)) {
+    res.status(409).json({ error: "Không thể xóa cự ly đã có người đăng ký" });
+    return;
+  }
+
+  const event = await prisma.$transaction(async (tx: TxClient) => {
+    await tx.event.update({
+      where: { id: eventId },
+      data: {
+        ...eventData,
+        eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
+        imageUrl: eventData.imageUrl || null,
+      },
+    });
+
+    if (toDelete.length > 0) {
+      await tx.distance.deleteMany({ where: { id: { in: toDelete.map((d) => d.id) } } });
+    }
+
+    for (const d of distances) {
+      if (d.id) {
+        await tx.distance.update({
+          where: { id: d.id },
+          data: { name: d.name, price: d.price, maxSlots: d.maxSlots, bibStart: d.bibStart, bibEnd: d.bibEnd },
+        });
+      } else {
+        await tx.distance.create({
+          data: { eventId, name: d.name, price: d.price, maxSlots: d.maxSlots, bibStart: d.bibStart, bibEnd: d.bibEnd },
+        });
+      }
+    }
+
+    return tx.event.findUnique({ where: { id: eventId }, include: { distances: true } });
+  });
+
   res.json(event);
 });
 
