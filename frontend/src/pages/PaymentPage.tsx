@@ -7,6 +7,28 @@ import { Loader2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 
+const BANK_NAMES: Record<string, string> = {
+  "970422": "MBBank",
+  "970436": "Vietcombank",
+  "970418": "BIDV",
+  "970415": "VietinBank",
+  "970405": "Agribank",
+  "970407": "Techcombank",
+  "970416": "ACB",
+  "970432": "VPBank",
+  "970423": "TPBank",
+  "970400": "SacomBank",
+  "970403": "Saigonbank",
+  "970443": "SHB",
+  "970437": "HDBank",
+  "970454": "VietCapital Bank",
+  "970301": "VietBank",
+};
+
+function getBankName(bin: string): string {
+  return BANK_NAMES[bin] ?? `BIN ${bin}`;
+}
+
 export function PaymentPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -80,27 +102,55 @@ export function PaymentPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-10">
-      <div className="bg-white rounded-2xl shadow-sm border p-6 max-w-sm w-full text-center">
-        <h1 className="text-lg font-bold text-gray-900 mb-1">Quét mã QR để thanh toán</h1>
-        <p className="text-3xl font-black text-indigo-600 mb-5">
-          {formatCurrency(data.payment.amount)}
-        </p>
+      <div className="bg-white rounded-2xl shadow-sm border p-6 max-w-sm w-full">
+        <div className="text-center mb-4">
+          <h1 className="text-lg font-bold text-gray-900 mb-1">Quét mã QR để thanh toán</h1>
+          <p className="text-3xl font-black text-indigo-600">
+            {formatCurrency(data.payment.amount)}
+          </p>
+        </div>
 
-        <div className="flex justify-center mb-5">
+        <div className="flex justify-center mb-4">
           <div className={`p-3 rounded-xl border-2 ${isExpired ? "opacity-30 border-gray-200" : "border-indigo-100"}`}>
             <QRCodeSVG value={data.qrCode} size={200} />
           </div>
         </div>
 
+        {/* Bank transfer info */}
+        <div className="bg-gray-50 rounded-xl p-3 mb-4 space-y-2 text-sm">
+          {data.bankAccountNumber && (
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Số tài khoản</span>
+              <span className="font-semibold">{data.bankAccountNumber}</span>
+            </div>
+          )}
+          {data.bankAccountName && (
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Chủ tài khoản</span>
+              <span className="font-semibold">{data.bankAccountName}</span>
+            </div>
+          )}
+          {data.bankBin && (
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Ngân hàng</span>
+              <span className="font-semibold">{getBankName(data.bankBin)}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-center border-t pt-2">
+            <span className="text-gray-500">Nội dung CK</span>
+            <span className="font-semibold text-indigo-600">{data.description}</span>
+          </div>
+        </div>
+
         {isExpired ? (
-          <div className="mb-4">
+          <div className="text-center mb-4">
             <p className="text-red-500 font-medium text-sm mb-3">Mã QR đã hết hạn</p>
             <Button onClick={() => refetch()} size="sm">Tạo mã mới</Button>
           </div>
         ) : (
-          <>
+          <div className="text-center">
             {minutes !== null && (
-              <div className="flex items-center justify-center gap-1.5 text-sm text-gray-500 mb-4">
+              <div className="flex items-center justify-center gap-1.5 text-sm text-gray-500 mb-2">
                 <Clock className="h-4 w-4" />
                 <span>
                   Hết hạn sau{" "}
@@ -110,15 +160,14 @@ export function PaymentPage() {
                 </span>
               </div>
             )}
-
             <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400 mb-1">
               <Loader2 className="h-3 w-3 animate-spin" />
               <span>Đang chờ xác nhận...</span>
             </div>
-          </>
+          </div>
         )}
 
-        <p className="text-xs text-gray-400 mt-3">
+        <p className="text-xs text-gray-400 text-center mt-3">
           Mở app ngân hàng → Quét QR → Xác nhận thanh toán.
           <br />
           Trang tự động chuyển khi thanh toán thành công.

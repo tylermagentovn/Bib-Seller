@@ -84,4 +84,8 @@ export interface PaymentResponse {
   payment: Payment;
   checkoutUrl: string | null;
   qrCode: string | null;
+  bankBin: string | null;
+  bankAccountNumber: string | null;
+  bankAccountName: string | null;
+  description: string;
 }

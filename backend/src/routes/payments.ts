@@ -25,13 +25,29 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
   }
 
   if (payment.status !== "PENDING") {
-    res.json({ payment, checkoutUrl: payment.checkoutUrl, qrCode: payment.qrCode });
+    res.json({
+      payment,
+      checkoutUrl: payment.checkoutUrl,
+      qrCode: payment.qrCode,
+      bankBin: payment.bankBin,
+      bankAccountNumber: payment.bankAccountNumber,
+      bankAccountName: payment.bankAccountName,
+      description: `BIB${registrationId.slice(-6).toUpperCase()}`,
+    });
     return;
   }
 
   // Return cached data if already created
   if (payment.checkoutUrl && payment.payosOrderCode) {
-    res.json({ payment, checkoutUrl: payment.checkoutUrl, qrCode: payment.qrCode });
+    res.json({
+      payment,
+      checkoutUrl: payment.checkoutUrl,
+      qrCode: payment.qrCode,
+      bankBin: payment.bankBin,
+      bankAccountNumber: payment.bankAccountNumber,
+      bankAccountName: payment.bankAccountName,
+      description: `BIB${registrationId.slice(-6).toUpperCase()}`,
+    });
     return;
   }
 
@@ -48,7 +64,11 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
     cancelUrl: `${frontendUrl}/payment/${registrationId}`,
   });
 
-  const qrCode = (payosRes as any).qrCode as string | undefined;
+  const r = payosRes as any;
+  const qrCode = r.qrCode as string | undefined;
+  const bankBin = r.bin as string | undefined;
+  const bankAccountNumber = r.accountNumber as string | undefined;
+  const bankAccountName = r.accountName as string | undefined;
 
   await prisma.payment.update({
     where: { id: payment.id },
@@ -56,10 +76,21 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
       payosOrderCode: String(orderCode),
       checkoutUrl: payosRes.checkoutUrl,
       qrCode: qrCode ?? null,
+      bankBin: bankBin ?? null,
+      bankAccountNumber: bankAccountNumber ?? null,
+      bankAccountName: bankAccountName ?? null,
     },
   });
 
-  res.json({ payment, checkoutUrl: payosRes.checkoutUrl, qrCode: qrCode ?? null });
+  res.json({
+    payment,
+    checkoutUrl: payosRes.checkoutUrl,
+    qrCode: qrCode ?? null,
+    bankBin: bankBin ?? null,
+    bankAccountNumber: bankAccountNumber ?? null,
+    bankAccountName: bankAccountName ?? null,
+    description,
+  });
 });
 
 // PayOS webhook

@@ -75,10 +75,13 @@ model Payment {
   id             String        @id @default(cuid())
   registrationId String        @unique
   amount         Int
-  payosOrderCode String?       @unique
-  checkoutUrl    String?
-  qrCode         String?
-  payosRef       String?
+  payosOrderCode    String?       @unique
+  checkoutUrl       String?
+  qrCode            String?
+  bankBin           String?
+  bankAccountNumber String?
+  bankAccountName   String?
+  payosRef          String?
   status         PaymentStatus @default(PENDING)
   paidAt         DateTime?
   expiresAt      DateTime
