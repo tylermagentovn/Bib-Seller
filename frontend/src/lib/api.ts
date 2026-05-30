@@ -24,6 +24,17 @@ api.interceptors.response.use(
 );
 
 // Types
+export interface TeamMember {
+  id: string;
+  registrationId: string;
+  memberIndex: number;
+  fullName: string;
+  phone: string;
+  email: string | null;
+  dob: string;
+  createdAt: string;
+}
+
 export interface Distance {
   id: string;
   eventId: string;
@@ -32,6 +43,8 @@ export interface Distance {
   maxSlots: number;
   bibStart: number;
   bibEnd: number;
+  type: "SOLO" | "RELAY";
+  teamSize: number | null;
   _count?: { registrations: number };
 }
 
@@ -65,6 +78,7 @@ export interface Registration {
   event: Event;
   distance: Distance;
   payment: Payment | null;
+  teamMembers: TeamMember[];
 }
 
 export interface Payment {

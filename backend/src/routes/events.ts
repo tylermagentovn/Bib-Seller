@@ -53,6 +53,8 @@ const distanceSchema = z.object({
   maxSlots: z.number().int().positive(),
   bibStart: z.number().int().positive(),
   bibEnd: z.number().int().positive(),
+  type: z.enum(["SOLO", "RELAY"]).default("SOLO"),
+  teamSize: z.number().int().min(2).optional().nullable(),
 });
 
 const eventSchema = z.object({
@@ -80,7 +82,17 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       ...eventData,
       eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
       imageUrl: eventData.imageUrl || null,
-      distances: { create: distances },
+      distances: {
+        create: distances.map((d) => ({
+          name: d.name,
+          price: d.price,
+          maxSlots: d.maxSlots,
+          bibStart: d.bibStart,
+          bibEnd: d.bibEnd,
+          type: d.type,
+          teamSize: d.type === "RELAY" ? (d.teamSize ?? null) : null,
+        })),
+      },
     },
     include: { distances: true },
   });
@@ -128,11 +140,28 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
       if (d.id) {
         await tx.distance.update({
           where: { id: d.id },
-          data: { name: d.name, price: d.price, maxSlots: d.maxSlots, bibStart: d.bibStart, bibEnd: d.bibEnd },
+          data: {
+            name: d.name,
+            price: d.price,
+            maxSlots: d.maxSlots,
+            bibStart: d.bibStart,
+            bibEnd: d.bibEnd,
+            type: d.type,
+            teamSize: d.type === "RELAY" ? (d.teamSize ?? null) : null,
+          },
         });
       } else {
         await tx.distance.create({
-          data: { eventId, name: d.name, price: d.price, maxSlots: d.maxSlots, bibStart: d.bibStart, bibEnd: d.bibEnd },
+          data: {
+            eventId,
+            name: d.name,
+            price: d.price,
+            maxSlots: d.maxSlots,
+            bibStart: d.bibStart,
+            bibEnd: d.bibEnd,
+            type: d.type,
+            teamSize: d.type === "RELAY" ? (d.teamSize ?? null) : null,
+          },
         });
       }
     }

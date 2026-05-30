@@ -19,6 +19,8 @@ const distanceSchema = z.object({
   maxSlots: z.number().int().positive("Phải > 0"),
   bibStart: z.number().int().positive("Phải > 0"),
   bibEnd: z.number().int().positive("Phải > 0"),
+  type: z.enum(["SOLO", "RELAY"]),
+  teamSize: z.number().int().min(2, "Tối thiểu 2 thành viên").optional().nullable(),
 });
 
 const eventSchema = z.object({
@@ -53,7 +55,7 @@ export function AdminEventsPage() {
   const { fields, append, remove } = useFieldArray({ control, name: "distances" });
 
   const openCreate = () => {
-    reset({ status: "DRAFT", distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] });
+    reset({ status: "DRAFT", distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
     setEditing(null);
     setShowForm(true);
   };
@@ -75,6 +77,8 @@ export function AdminEventsPage() {
         maxSlots: d.maxSlots,
         bibStart: d.bibStart,
         bibEnd: d.bibEnd,
+        type: d.type ?? "SOLO",
+        teamSize: d.teamSize ?? null,
       })),
     });
     setEditing(event);
@@ -123,7 +127,7 @@ export function AdminEventsPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit((d: FormData) => saveMutation.mutate(d))} className="p-5 space-y-4">
+            <form onSubmit={handleSubmit((d) => saveMutation.mutate(d))} className="p-5 space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Tên sự kiện *</Label>
@@ -179,7 +183,7 @@ export function AdminEventsPage() {
               <div className="border-t pt-4">
                 <div className="flex items-center justify-between mb-3">
                   <Label className="text-base">Các cự ly</Label>
-                  <Button type="button" size="sm" variant="outline" onClick={() => append({ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 })}>
+                  <Button type="button" size="sm" variant="outline" onClick={() => append({ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null })}>
                     <Plus className="h-3.5 w-3.5 mr-1" /> Thêm cự ly
                   </Button>
                 </div>
@@ -194,11 +198,31 @@ export function AdminEventsPage() {
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-2.5 md:grid-cols-5">
+                    <div className="grid grid-cols-2 gap-2.5 md:grid-cols-6">
                       <div className="col-span-2 md:col-span-1 space-y-1">
                         <Label className="text-xs">Tên</Label>
                         <Input className="h-8 text-sm" {...register(`distances.${i}.name`)} placeholder="10KM" />
                       </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Loại</Label>
+                        <Select
+                          value={watch(`distances.${i}.type`) ?? "SOLO"}
+                          onValueChange={(v) => setValue(`distances.${i}.type`, v as "SOLO" | "RELAY")}
+                        >
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="SOLO">Solo</SelectItem>
+                            <SelectItem value="RELAY">Relay</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {watch(`distances.${i}.type`) === "RELAY" && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Số TV</Label>
+                          <Input className="h-8 text-sm" type="number" placeholder="4" {...register(`distances.${i}.teamSize`, { valueAsNumber: true })} />
+                          {errors.distances?.[i]?.teamSize && <p className="text-xs text-red-500">{errors.distances[i].teamSize?.message}</p>}
+                        </div>
+                      )}
                       <div className="space-y-1">
                         <Label className="text-xs">Giá (VNĐ)</Label>
                         <Input className="h-8 text-sm" type="number" {...register(`distances.${i}.price`, { valueAsNumber: true })} />

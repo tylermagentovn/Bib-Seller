@@ -33,13 +33,15 @@ model Event {
 }
 
 model Distance {
-  id       String @id @default(cuid())
+  id       String       @id @default(cuid())
   eventId  String
   name     String
   price    Int
   maxSlots Int
   bibStart Int
   bibEnd   Int
+  type     DistanceType @default(SOLO)
+  teamSize Int?
 
   event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
   registrations Registration[]
@@ -62,13 +64,29 @@ model Registration {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  event    Event    @relation(fields: [eventId], references: [id])
-  distance Distance @relation(fields: [distanceId], references: [id])
-  payment  Payment?
+  event       Event        @relation(fields: [eventId], references: [id])
+  distance    Distance     @relation(fields: [distanceId], references: [id])
+  payment     Payment?
+  teamMembers TeamMember[]
 
   @@index([eventId])
   @@index([distanceId])
   @@index([email])
+}
+
+model TeamMember {
+  id             String       @id @default(cuid())
+  registrationId String
+  memberIndex    Int
+  fullName       String
+  phone          String
+  email          String?
+  dob            DateTime
+  createdAt      DateTime     @default(now())
+
+  registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([registrationId])
 }
 
 model Payment {
@@ -90,6 +108,11 @@ model Payment {
   registration Registration @relation(fields: [registrationId], references: [id])
 
   @@index([payosOrderCode])
+}
+
+enum DistanceType {
+  SOLO
+  RELAY
 }
 
 enum EventStatus {

@@ -6,6 +6,13 @@ import { appendRegistrationToSheet } from "../services/sheets";
 
 const router = Router();
 
+const teamMemberSchema = z.object({
+  fullName: z.string().min(1),
+  phone: z.string().min(9),
+  email: z.string().email().optional().or(z.literal("")),
+  dob: z.string(),
+});
+
 const registrationSchema = z.object({
   eventId: z.string().min(1),
   distanceId: z.string().min(1),
@@ -15,6 +22,7 @@ const registrationSchema = z.object({
   dob: z.string(),
   emergencyName: z.string().min(1),
   emergencyPhone: z.string().min(9),
+  teamMembers: z.array(teamMemberSchema).optional(),
 });
 
 // Public: create registration
@@ -46,24 +54,49 @@ router.post("/", async (req: Request, res: Response) => {
     return;
   }
 
+  // Validate team members for RELAY distances
+  if (distance.type === "RELAY") {
+    const required = distance.teamSize ?? 2;
+    if (!data.teamMembers || data.teamMembers.length !== required) {
+      res.status(400).json({ error: `Cự ly tiếp sức yêu cầu đúng ${required} thành viên` });
+      return;
+    }
+  }
+
   const timeoutMinutes = Number(process.env.PAYMENT_TIMEOUT_MINUTES ?? 15);
   const expiresAt = new Date(Date.now() + timeoutMinutes * 60 * 1000);
 
+  const { teamMembers, ...registrationData } = data;
+
   const registration = await prisma.registration.create({
     data: {
-      ...data,
-      dob: new Date(data.dob),
+      ...registrationData,
+      dob: new Date(registrationData.dob),
       payment: {
         create: {
           amount: distance.price,
           expiresAt,
         },
       },
+      ...(distance.type === "RELAY" && teamMembers
+        ? {
+            teamMembers: {
+              create: teamMembers.map((m, i) => ({
+                memberIndex: i + 1,
+                fullName: m.fullName,
+                phone: m.phone,
+                email: m.email || null,
+                dob: new Date(m.dob),
+              })),
+            },
+          }
+        : {}),
     },
     include: {
       payment: true,
       distance: true,
       event: true,
+      teamMembers: true,
     },
   });
 
@@ -90,7 +123,7 @@ router.post("/", async (req: Request, res: Response) => {
 router.get("/:id", async (req: Request, res: Response) => {
   const registration = await prisma.registration.findUnique({
     where: { id: req.params.id as string },
-    include: { payment: true, distance: true, event: true },
+    include: { payment: true, distance: true, event: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
   });
   if (!registration) {
     res.status(404).json({ error: "Not found" });
@@ -110,7 +143,7 @@ router.get("/admin/all", requireAuth, async (req: Request, res: Response) => {
   const [registrations, total] = await Promise.all([
     prisma.registration.findMany({
       where,
-      include: { event: true, distance: true, payment: true },
+      include: { event: true, distance: true, payment: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
       orderBy: { createdAt: "desc" },
       skip,
       take: Number(limit),
