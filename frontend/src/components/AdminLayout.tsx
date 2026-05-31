@@ -1,7 +1,8 @@
 import { Navigate, Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Waves, LayoutDashboard, Calendar, Users, LogOut, Loader2 } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, LogOut, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Bib1sLogo } from "./Bib1sLogo";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
@@ -28,9 +29,8 @@ export function AdminLayout() {
       {/* Sidebar */}
       <aside className="w-60 bg-white border-r flex flex-col fixed h-full">
         <div className="p-5 border-b">
-          <Link to="/admin" className="flex items-center gap-2 font-bold text-cyan-600">
-            <Waves className="h-5 w-5" />
-            Song Ngư Admin
+          <Link to="/admin">
+            <Bib1sLogo />
           </Link>
         </div>
 

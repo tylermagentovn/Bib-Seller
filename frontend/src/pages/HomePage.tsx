@@ -16,11 +16,11 @@ export function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Helmet>
-        <title>Song Ngư Club — Đăng ký sự kiện bơi lội</title>
-        <meta name="description" content="Ứng dụng đăng ký sự kiện phát triển bởi CLB Bơi Song Ngư." />
+        <title>Bib1s - Nền tảng đăng ký BIB giải đấu miễn phí.</title>
+        <meta name="description" content="Nền tảng đăng ký BIB giải đấu miễn phí" />
         <meta property="og:url" content="https://songngu.info/" />
-        <meta property="og:title" content="Song Ngư Club — Đăng ký sự kiện bơi lội" />
-        <meta property="og:description" content="Ứng dụng đăng ký sự kiện phát triển bởi CLB Bơi Song Ngư." />
+        <meta property="og:title" content="Nền tảng đăng ký BIB giải đấu miễn phí" />
+        <meta property="og:description" content="Nền tảng đăng ký BIB giải đấu miễn phí" />
         <meta property="og:image" content="https://songngu.info/banner.jpg" />
       </Helmet>
       {/* Hero */}
@@ -35,14 +35,13 @@ export function HomePage() {
         <div className="absolute inset-0 bg-black/55" />
         <div className="relative max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm mb-6 border border-white/20">
-            <Waves className="h-4 w-4" />
-            Song Ngư Club — Ứng dụng đăng ký sự kiện phát triển bởi CLB Bơi Song Ngư
+            Aquathlon Cửa Lò
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight drop-shadow-lg">
             Đăng ký BIB<br />đơn giản & nhanh chóng
           </h1>
           <p className="text-white/80 text-lg max-w-xl mx-auto drop-shadow">
-            Chọn sự kiện, điền thông tin, thanh toán và nhận BIB ngay lập tức.
+            Chọn sự kiện, điền thông tin, thanh toán và nhận số BIB ngay lập tức.
           </p>
         </div>
       </section>

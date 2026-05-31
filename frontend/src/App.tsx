@@ -35,7 +35,7 @@ function PublicLayout() {
         </Routes>
       </div>
       <footer className="bg-white border-t py-4 text-center text-xs text-gray-400">
-        Copyright by Song Ngu Team 2026
+        Copyright by Bib1s 2026
       </footer>
     </div>
   );
