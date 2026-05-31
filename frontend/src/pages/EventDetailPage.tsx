@@ -1,3 +1,4 @@
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
@@ -41,6 +42,36 @@ export function EventDetailPage() {
   const pageDescription = event.description.slice(0, 160);
   const pageImage = event.imageUrl || "https://songngu.info/banner.jpg";
   const pageUrl = `https://songngu.info/events/${event.slug}`;
+
+  // Convert plain text URLs into anchor elements while preserving whitespace
+  const linkify = (text: string) => {
+    if (!text) return null;
+    const urlRegex = /https?:\/\/[\S]+/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let i = 0;
+    while ((match = urlRegex.exec(text)) !== null) {
+      const index = match.index;
+      if (index > lastIndex) parts.push(text.slice(lastIndex, index));
+      const url = match[0];
+      parts.push(
+        <a
+          key={`link-${i}`}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-indigo-600 underline break-words"
+        >
+          bấm vào đây để đọc
+        </a>
+      );
+      lastIndex = index + url.length;
+      i += 1;
+    }
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+    return parts;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -101,7 +132,7 @@ export function EventDetailPage() {
           {event.rules && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border">
               <h2 className="font-semibold text-gray-900 text-lg mb-3">Quy định tham gia</h2>
-              <div className="text-gray-600 leading-relaxed whitespace-pre-wrap text-sm">{event.rules}</div>
+              <div className="text-gray-600 leading-relaxed whitespace-pre-wrap break-words text-sm">{linkify(event.rules)}</div>
             </div>
           )}
 
@@ -126,8 +157,8 @@ export function EventDetailPage() {
         </div>
 
         {/* Sidebar: register CTA */}
-        <div className="md:col-span-1">
-          <div className="sticky top-24 bg-white rounded-2xl p-6 shadow-sm border">
+        <div className="md:col-span-1 order-first md:order-none">
+          <div className="md:sticky md:top-24 bg-white rounded-2xl p-6 shadow-sm border">
             <h3 className="font-bold text-gray-900 text-lg mb-4">Đăng ký tham gia</h3>
             <div className="space-y-2 mb-6">
               {event.distances.map((d) => (
