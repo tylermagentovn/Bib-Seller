@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Loader2, Pencil, ChevronLeft, ChevronRight, Search,
   X, User, Phone, Mail, Calendar, Shield, CreditCard,
-  PenLine, Users, CheckCircle, Clock, Download,
+  PenLine, Users, CheckCircle, Clock, Download, Trash2,
 } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -232,6 +232,40 @@ function DetailModal({ reg, onClose, onEditBib }: { reg: Registration; onClose: 
   );
 }
 
+function ConfirmDeleteModal({ reg, onConfirm, onCancel, isPending }: {
+  reg: Registration;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+            <Trash2 className="h-5 w-5 text-red-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">Xác nhận xóa</h3>
+            <p className="text-sm text-gray-500">Hành động này không thể hoàn tác</p>
+          </div>
+        </div>
+        <p className="text-sm text-gray-700 mb-6">
+          Bạn có chắc muốn xóa đăng ký của{" "}
+          <span className="font-semibold">{reg.fullName}</span>?
+          Toàn bộ thông tin thanh toán liên quan cũng sẽ bị xóa.
+        </p>
+        <div className="flex gap-3 justify-end">
+          <Button variant="outline" onClick={onCancel} disabled={isPending}>Hủy</Button>
+          <Button variant="destructive" onClick={onConfirm} disabled={isPending}>
+            {isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Đang xóa...</> : "Xóa"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminRegistrationsPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -240,6 +274,7 @@ export function AdminRegistrationsPage() {
   const [newBib, setNewBib] = useState("");
   const [search, setSearch] = useState("");
   const [detailReg, setDetailReg] = useState<Registration | null>(null);
+  const [deletingReg, setDeletingReg] = useState<Registration | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async () => {
@@ -278,6 +313,15 @@ export function AdminRegistrationsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-registrations"] });
       setEditingReg(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/registrations/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-registrations"] });
+      setDeletingReg(null);
+      setDetailReg(null);
     },
   });
 
@@ -409,14 +453,24 @@ export function AdminRegistrationsPage() {
                   <td className="p-4">{statusBadge(reg.status)}</td>
                   <td className="p-4 text-gray-500 text-xs">{formatDate(reg.createdAt)}</td>
                   <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      onClick={() => { setEditingReg(reg); setNewBib(String(reg.bibNumber ?? "")); }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => { setEditingReg(reg); setNewBib(String(reg.bibNumber ?? "")); }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50"
+                        onClick={() => setDeletingReg(reg)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -452,6 +506,16 @@ export function AdminRegistrationsPage() {
             setNewBib(String(detailReg.bibNumber ?? ""));
             setDetailReg(null);
           }}
+        />
+      )}
+
+      {/* Confirm delete */}
+      {deletingReg && (
+        <ConfirmDeleteModal
+          reg={deletingReg}
+          isPending={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(deletingReg.id)}
+          onCancel={() => setDeletingReg(null)}
         />
       )}
     </div>

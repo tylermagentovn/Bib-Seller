@@ -250,6 +250,21 @@ router.post("/:id/sign-disclaimer", async (req: Request, res: Response) => {
   res.json(updated);
 });
 
+// Admin: delete registration
+router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const registration = await prisma.registration.findUnique({ where: { id } });
+  if (!registration) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  await prisma.$transaction([
+    prisma.payment.deleteMany({ where: { registrationId: id } }),
+    prisma.registration.delete({ where: { id } }),
+  ]);
+  res.status(204).send();
+});
+
 // Admin: update bib manually
 router.patch("/:id/bib", requireAuth, async (req: Request, res: Response) => {
   const { bibNumber } = req.body;
