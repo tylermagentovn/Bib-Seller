@@ -35,7 +35,7 @@ export function HomePage() {
         <div className="absolute inset-0 bg-black/55" />
         <div className="relative max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-1.5 text-sm mb-6 border border-white/20">
-            Aquathlon Cửa Lò
+            Bib1s - Nền tảng đăng ký BIB giải đấu miễn phí
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight drop-shadow-lg">
             Đăng ký BIB<br />đơn giản & nhanh chóng
