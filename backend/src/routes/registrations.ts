@@ -132,6 +132,71 @@ router.get("/:id", async (req: Request, res: Response) => {
   res.json(registration);
 });
 
+// Admin: export registrations as CSV
+router.get("/admin/export", requireAuth, async (req: Request, res: Response) => {
+  const { eventId, status } = req.query;
+  const where: Record<string, unknown> = {};
+  if (eventId) where.eventId = eventId;
+  if (status) where.status = status;
+
+  const registrations = await prisma.registration.findMany({
+    where,
+    include: { event: true, distance: true, payment: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const escape = (val: string | null | undefined) => {
+    if (val == null) return "";
+    const s = String(val);
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+
+  const headers = [
+    "ID", "Họ tên", "Ngày sinh", "Điện thoại", "Email",
+    "Sự kiện", "Cự ly", "Loại", "BIB",
+    "Liên hệ khẩn cấp", "SĐT khẩn cấp",
+    "Trạng thái", "Số tiền (VNĐ)", "Thời gian thanh toán", "Mã tham chiếu",
+    "Đã ký miễn trừ", "Thành viên nhóm",
+    "Ngày đăng ký",
+  ];
+
+  const rows = registrations.map((r) => {
+    const members = r.teamMembers
+      .map((m) => `${m.memberIndex}.${m.fullName}(${m.phone})`)
+      .join("; ");
+
+    return [
+      r.id,
+      r.fullName,
+      r.dob.toISOString().split("T")[0],
+      r.phone,
+      r.email,
+      r.event.name,
+      r.distance.name,
+      r.distance.type === "RELAY" ? "Tiếp sức" : "Cá nhân",
+      r.bibNumber ?? "",
+      r.emergencyName,
+      r.emergencyPhone,
+      r.status === "PAID" ? "Đã thanh toán" : r.status === "CANCELLED" ? "Đã hủy" : "Chờ thanh toán",
+      r.payment?.amount ?? "",
+      r.payment?.paidAt ? r.payment.paidAt.toISOString().replace("T", " ").slice(0, 19) : "",
+      r.payment?.payosRef ?? "",
+      r.disclaimerSignedAt ? "Có" : "Không",
+      members,
+      r.createdAt.toISOString().replace("T", " ").slice(0, 19),
+    ].map(escape).join(",");
+  });
+
+  const csv = "﻿" + [headers.join(","), ...rows].join("\r\n");
+  const filename = `dang-ky-${new Date().toISOString().slice(0, 10)}.csv`;
+
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(csv);
+});
+
 // Admin: list all registrations
 router.get("/admin/all", requireAuth, async (req: Request, res: Response) => {
   const { eventId, status, page = "1", limit = "50" } = req.query;

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Loader2, Pencil, ChevronLeft, ChevronRight, Search,
   X, User, Phone, Mail, Calendar, Shield, CreditCard,
-  PenLine, Users, CheckCircle, Clock,
+  PenLine, Users, CheckCircle, Clock, Download,
 } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -240,6 +240,28 @@ export function AdminRegistrationsPage() {
   const [newBib, setNewBib] = useState("");
   const [search, setSearch] = useState("");
   const [detailReg, setDetailReg] = useState<Registration | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter !== "ALL") params.set("status", statusFilter);
+      const token = localStorage.getItem("admin_token");
+      const res = await fetch(`/api/registrations/admin/export?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dang-ky-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-registrations", { page, status: statusFilter }],
@@ -285,6 +307,12 @@ export function AdminRegistrationsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Danh sách đăng ký</h1>
           <p className="text-gray-500 text-sm mt-1">{total} tổng cộng</p>
         </div>
+        <Button variant="outline" onClick={handleExport} disabled={exporting}>
+          {exporting
+            ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Đang xuất...</>
+            : <><Download className="h-4 w-4 mr-1.5" /> Xuất CSV</>
+          }
+        </Button>
       </div>
 
       {/* Filters */}
