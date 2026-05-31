@@ -21,6 +21,7 @@ model Event {
   slug        String      @unique
   description String
   rules       String?
+  disclaimer  String?
   imageUrl    String?
   location    String?
   eventDate   DateTime?
@@ -59,10 +60,12 @@ model Registration {
   dob            DateTime
   emergencyName  String
   emergencyPhone String
-  bibNumber      Int?
-  status         RegistrationStatus @default(PENDING)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  bibNumber           Int?
+  disclaimerSignature String?
+  disclaimerSignedAt  DateTime?
+  status              RegistrationStatus @default(PENDING)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   event       Event        @relation(fields: [eventId], references: [id])
   distance    Distance     @relation(fields: [distanceId], references: [id])

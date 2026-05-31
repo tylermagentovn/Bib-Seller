@@ -54,6 +54,7 @@ export interface Event {
   slug: string;
   description: string;
   rules: string | null;
+  disclaimer: string | null;
   imageUrl: string | null;
   location: string | null;
   eventDate: string | null;
@@ -73,6 +74,8 @@ export interface Registration {
   emergencyName: string;
   emergencyPhone: string;
   bibNumber: number | null;
+  disclaimerSignature: string | null;
+  disclaimerSignedAt: string | null;
   status: "PENDING" | "PAID" | "CANCELLED";
   createdAt: string;
   event: Event;

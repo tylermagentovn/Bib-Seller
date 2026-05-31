@@ -3,10 +3,13 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api, type Registration } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Waves, Loader2, RefreshCw, CheckCircle, XCircle } from "lucide-react";
+import { SignaturePad } from "@/components/SignaturePad";
+import { Waves, Loader2, RefreshCw, CheckCircle, XCircle, PenLine } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 const SPIN_DURATION = 2500;
+
+type Step = "disclaimer" | "bib";
 
 export function PaymentSuccessPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +17,8 @@ export function PaymentSuccessPage() {
   const [currentBib, setCurrentBib] = useState<number | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [step, setStep] = useState<Step | null>(null);
+  const [signature, setSignature] = useState<string | null>(null);
 
   const isCancelled = searchParams.get("cancel") === "true";
   const isSuccess = searchParams.get("code") === "00" && !isCancelled;
@@ -22,7 +27,6 @@ export function PaymentSuccessPage() {
     queryKey: ["registration", id],
     queryFn: () => api.get(`/registrations/${id}`).then((r) => r.data),
     enabled: !!id,
-    // Poll until PAID (webhook may arrive slightly after redirect)
     refetchInterval: (query) => {
       const reg = query.state.data;
       if (isCancelled) return false;
@@ -30,12 +34,27 @@ export function PaymentSuccessPage() {
     },
   });
 
+  // Determine flow step when registration becomes PAID
+  useEffect(() => {
+    if (registration?.status === "PAID" && step === null) {
+      const hasDisclaimer = !!registration.event.disclaimer;
+      const alreadySigned = !!registration.disclaimerSignedAt;
+      setStep(hasDisclaimer && !alreadySigned ? "disclaimer" : "bib");
+    }
+  }, [registration?.status, step]);
+
   useEffect(() => {
     if (registration?.bibNumber) {
       setCurrentBib(registration.bibNumber);
       setConfirmed(true);
     }
   }, [registration?.bibNumber]);
+
+  const signMutation = useMutation({
+    mutationFn: () =>
+      api.post(`/registrations/${id}/sign-disclaimer`, { signature }).then((r) => r.data),
+    onSuccess: () => setStep("bib"),
+  });
 
   const spinMutation = useMutation({
     mutationFn: () => api.get(`/payments/bib/spin/${id}`).then((r) => r.data),
@@ -86,7 +105,7 @@ export function PaymentSuccessPage() {
     );
   }
 
-  // Waiting for payment confirmation (webhook not yet received)
+  // Waiting for payment webhook
   if (isLoading || (isSuccess && registration?.status !== "PAID")) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
@@ -97,8 +116,84 @@ export function PaymentSuccessPage() {
     );
   }
 
-  if (!registration) return null;
+  if (!registration || !step) return null;
 
+  // Shared registration summary card
+  const summaryCard = (
+    <div className="bg-white rounded-2xl shadow-sm border p-5 mb-6 space-y-2 text-sm">
+      <div className="flex justify-between">
+        <span className="text-gray-500">Sự kiện</span>
+        <span className="font-medium text-right max-w-[60%]">{registration.event.name}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-gray-500">Cự ly</span>
+        <span className="font-medium">{registration.distance.name}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-gray-500">Họ tên</span>
+        <span className="font-medium">{registration.fullName}</span>
+      </div>
+      <div className="flex justify-between border-t pt-2">
+        <span className="text-gray-500">Đã thanh toán</span>
+        <span className="font-bold text-green-600">{formatCurrency(registration.payment?.amount ?? 0)}</span>
+      </div>
+    </div>
+  );
+
+  // Step 1: Disclaimer signing
+  if (step === "disclaimer") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-violet-50 py-10 px-4">
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Thanh toán thành công!</h1>
+            <p className="text-gray-500 mt-1">Vui lòng đọc và ký bản miễn trừ trách nhiệm</p>
+          </div>
+
+          {summaryCard}
+
+          <div className="bg-white rounded-2xl shadow-sm border p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <PenLine className="h-5 w-5 text-indigo-600" />
+              <h2 className="font-bold text-gray-900">Bản miễn trừ trách nhiệm</h2>
+            </div>
+
+            <div className="text-sm text-gray-600 whitespace-pre-wrap max-h-56 overflow-y-auto border rounded-xl p-3 bg-gray-50 mb-5 leading-relaxed">
+              {registration.event.disclaimer}
+            </div>
+
+            <p className="text-sm font-medium text-gray-700 mb-2">
+              Ký tên xác nhận <span className="text-red-500">*</span>
+            </p>
+            <SignaturePad onChange={setSignature} />
+
+            <Button
+              size="lg"
+              className="w-full mt-4"
+              disabled={!signature || signMutation.isPending}
+              onClick={() => signMutation.mutate()}
+            >
+              {signMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Đang lưu...</>
+              ) : (
+                "Xác nhận & Tiếp tục →"
+              )}
+            </Button>
+            {signMutation.isError && (
+              <p className="text-xs text-red-500 text-center mt-2">
+                Lỗi xác nhận, vui lòng thử lại
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: BIB spinner
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-violet-50 py-10 px-4">
       <div className="max-w-md mx-auto">
@@ -112,24 +207,7 @@ export function PaymentSuccessPage() {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border p-5 mb-6 space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-500">Sự kiện</span>
-            <span className="font-medium text-right max-w-[60%]">{registration.event.name}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Cự ly</span>
-            <span className="font-medium">{registration.distance.name}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Họ tên</span>
-            <span className="font-medium">{registration.fullName}</span>
-          </div>
-          <div className="flex justify-between border-t pt-2">
-            <span className="text-gray-500">Đã thanh toán</span>
-            <span className="font-bold text-green-600">{formatCurrency(registration.payment?.amount ?? 0)}</span>
-          </div>
-        </div>
+        {summaryCard}
 
         <div className="bg-white rounded-2xl shadow-sm border p-6 text-center">
           <div className="mb-2 text-sm font-medium text-gray-500 uppercase tracking-widest">Số BIB</div>

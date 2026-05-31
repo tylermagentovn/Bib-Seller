@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { api, type PaymentResponse } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
 import { Loader2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
+
+const IS_DEV = import.meta.env.DEV;
 
 const BANK_NAMES: Record<string, string> = {
   "970422": "MBBank",
@@ -33,6 +35,11 @@ export function PaymentPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  const devConfirmMutation = useMutation({
+    mutationFn: () => api.post(`/payments/dev-confirm/${id}`).then((r) => r.data),
+    onSuccess: () => navigate(`/payment/${id}/success?code=00`, { replace: true }),
+  });
 
   const { data, isLoading, isError, refetch } = useQuery<PaymentResponse>({
     queryKey: ["payment", id],
@@ -172,6 +179,22 @@ export function PaymentPage() {
           <br />
           Trang tự động chuyển khi thanh toán thành công.
         </p>
+
+        {IS_DEV && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full mt-4 border-dashed border-orange-300 text-orange-500 hover:bg-orange-50 hover:text-orange-600"
+            onClick={() => devConfirmMutation.mutate()}
+            disabled={devConfirmMutation.isPending}
+          >
+            {devConfirmMutation.isPending ? (
+              <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Đang xử lý...</>
+            ) : (
+              "⚡ Bỏ qua thanh toán (Dev)"
+            )}
+          </Button>
+        )}
 
         {data.checkoutUrl && (
           <a

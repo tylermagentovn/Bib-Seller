@@ -137,6 +137,42 @@ router.post("/webhook/payos", async (req: Request, res: Response) => {
   }
 });
 
+// Dev-only: instantly confirm payment (skip PayOS webhook)
+router.post("/dev-confirm/:registrationId", async (req: Request, res: Response) => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(403).json({ error: "Not available in production" });
+    return;
+  }
+
+  const registrationId = req.params.registrationId as string;
+  const payment = await prisma.payment.findUnique({
+    where: { registrationId },
+  });
+
+  if (!payment) {
+    res.status(404).json({ error: "Payment not found" });
+    return;
+  }
+
+  if (payment.status === "PAID") {
+    res.json({ already: true });
+    return;
+  }
+
+  await prisma.$transaction([
+    prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: "PAID", paidAt: new Date(), payosRef: "dev-bypass" },
+    }),
+    prisma.registration.update({
+      where: { id: registrationId },
+      data: { status: "PAID" },
+    }),
+  ]);
+
+  res.json({ success: true });
+});
+
 // BIB spin: get a random available BIB number
 router.get("/bib/spin/:registrationId", async (req: Request, res: Response) => {
   const registrationId = req.params.registrationId as string;

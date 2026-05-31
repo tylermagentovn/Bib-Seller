@@ -6,9 +6,231 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Pencil, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import {
+  Loader2, Pencil, ChevronLeft, ChevronRight, Search,
+  X, User, Phone, Mail, Calendar, Shield, CreditCard,
+  PenLine, Users, CheckCircle, Clock,
+} from "lucide-react";
 
 const PAGE_SIZE = 20;
+
+function DetailModal({ reg, onClose, onEditBib }: { reg: Registration; onClose: () => void; onEditBib: () => void }) {
+  const statusBadge = (s: string) => {
+    if (s === "PAID") return <Badge variant="success">Đã thanh toán</Badge>;
+    if (s === "CANCELLED") return <Badge variant="destructive">Đã hủy</Badge>;
+    return <Badge variant="warning">Chờ thanh toán</Badge>;
+  };
+
+  const payStatusBadge = (s: string) => {
+    if (s === "PAID") return <Badge variant="success">Đã TT</Badge>;
+    if (s === "EXPIRED") return <Badge variant="destructive">Hết hạn</Badge>;
+    return <Badge variant="warning">Chờ</Badge>;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex justify-end" onClick={onClose}>
+      <div
+        className="bg-white w-full max-w-lg h-full overflow-y-auto shadow-xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 border-b sticky top-0 bg-white z-10">
+          <div>
+            <h2 className="font-bold text-lg text-gray-900">{reg.fullName}</h2>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {statusBadge(reg.status)}
+              {reg.bibNumber && (
+                <span className="text-sm font-mono font-bold text-indigo-600">BIB #{reg.bibNumber}</span>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2 items-center">
+            <Button size="sm" variant="outline" onClick={onEditBib}>
+              <Pencil className="h-3.5 w-3.5 mr-1" /> Sửa BIB
+            </Button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-1">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Sự kiện / Cự ly */}
+          <section>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Sự kiện</h3>
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Sự kiện</span>
+                <span className="font-medium text-right max-w-[60%]">{reg.event.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Cự ly</span>
+                <span className="font-medium">{reg.distance.name} ({reg.distance.type === "RELAY" ? "Tiếp sức" : "Cá nhân"})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Ngày đăng ký</span>
+                <span className="font-medium">{formatDate(reg.createdAt)}</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Thông tin cá nhân */}
+          <section>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Thông tin cá nhân</h3>
+            <div className="bg-gray-50 rounded-xl p-4 space-y-3 text-sm">
+              <div className="flex items-center gap-2.5">
+                <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <div className="flex justify-between w-full">
+                  <span className="text-gray-500">Họ tên</span>
+                  <span className="font-medium">{reg.fullName}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <div className="flex justify-between w-full">
+                  <span className="text-gray-500">Ngày sinh</span>
+                  <span className="font-medium">{formatDate(reg.dob)}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <div className="flex justify-between w-full">
+                  <span className="text-gray-500">Điện thoại</span>
+                  <span className="font-medium">{reg.phone}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <div className="flex justify-between w-full">
+                  <span className="text-gray-500">Email</span>
+                  <span className="font-medium text-right break-all max-w-[60%]">{reg.email}</span>
+                </div>
+              </div>
+              <div className="border-t pt-3 mt-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-4 w-4 text-gray-400" />
+                  <span className="text-xs text-gray-500 font-medium">Liên hệ khẩn cấp</span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-500">Họ tên</span>
+                  <span className="font-medium">{reg.emergencyName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Điện thoại</span>
+                  <span className="font-medium">{reg.emergencyPhone}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Thành viên nhóm (Relay) */}
+          {reg.teamMembers && reg.teamMembers.length > 0 && (
+            <section>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5" /> Thành viên nhóm ({reg.teamMembers.length} người)
+              </h3>
+              <div className="space-y-2.5">
+                {reg.teamMembers.map((m) => (
+                  <div key={m.id} className="bg-gray-50 rounded-xl p-4 text-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold">
+                        {m.memberIndex}
+                      </span>
+                      <span className="font-semibold text-gray-900">{m.fullName}</span>
+                    </div>
+                    <div className="space-y-1 text-xs text-gray-500 pl-7">
+                      <div className="flex gap-4">
+                        <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{m.phone}</span>
+                        {m.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{m.email}</span>}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Ngày sinh: {formatDate(m.dob)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Thông tin thanh toán */}
+          <section>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <CreditCard className="h-3.5 w-3.5" /> Thanh toán
+            </h3>
+            {reg.payment ? (
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Trạng thái</span>
+                  {payStatusBadge(reg.payment.status)}
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Số tiền</span>
+                  <span className="font-bold text-green-600">{formatCurrency(reg.payment.amount)}</span>
+                </div>
+                {reg.payment.paidAt && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Thời gian TT</span>
+                    <span className="font-medium">{new Date(reg.payment.paidAt).toLocaleString("vi-VN")}</span>
+                  </div>
+                )}
+                {reg.payment.payosRef && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Mã tham chiếu</span>
+                    <span className="font-mono text-xs text-gray-700">{reg.payment.payosRef}</span>
+                  </div>
+                )}
+                {reg.payment.payosOrderCode && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Order code</span>
+                    <span className="font-mono text-xs text-gray-700">{reg.payment.payosOrderCode}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Hết hạn</span>
+                  <span className="text-xs text-gray-600">{new Date(reg.payment.expiresAt).toLocaleString("vi-VN")}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 bg-gray-50 rounded-xl p-4">Không có thông tin thanh toán</p>
+            )}
+          </section>
+
+          {/* Chữ ký miễn trừ trách nhiệm */}
+          <section>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <PenLine className="h-3.5 w-3.5" /> Chữ ký miễn trừ trách nhiệm
+            </h3>
+            {reg.disclaimerSignedAt ? (
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Đã ký lúc {new Date(reg.disclaimerSignedAt).toLocaleString("vi-VN")}</span>
+                </div>
+                {reg.disclaimerSignature && (
+                  <div className="border rounded-xl overflow-hidden bg-white p-2">
+                    <img
+                      src={reg.disclaimerSignature}
+                      alt="Chữ ký"
+                      className="w-full object-contain max-h-36"
+                      style={{ background: "white" }}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-2 text-sm text-gray-400">
+                <Clock className="h-4 w-4" />
+                Chưa ký
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function AdminRegistrationsPage() {
   const queryClient = useQueryClient();
@@ -17,6 +239,7 @@ export function AdminRegistrationsPage() {
   const [editingReg, setEditingReg] = useState<Registration | null>(null);
   const [newBib, setNewBib] = useState("");
   const [search, setSearch] = useState("");
+  const [detailReg, setDetailReg] = useState<Registration | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-registrations", { page, status: statusFilter }],
@@ -111,7 +334,11 @@ export function AdminRegistrationsPage() {
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-12 text-gray-400">Không có dữ liệu</td></tr>
               ) : filtered.map((reg) => (
-                <tr key={reg.id} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={reg.id}
+                  className="hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => setDetailReg(reg)}
+                >
                   <td className="p-4">
                     <div className="font-medium text-gray-900">{reg.fullName}</div>
                     <div className="text-xs text-gray-400 mt-0.5">{formatDate(reg.dob)}</div>
@@ -124,7 +351,7 @@ export function AdminRegistrationsPage() {
                     <div className="text-gray-900">{reg.phone}</div>
                     <div className="text-xs text-gray-400 truncate max-w-[140px]">{reg.email}</div>
                   </td>
-                  <td className="p-4">
+                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
                     {editingReg?.id === reg.id ? (
                       <div className="flex items-center gap-1">
                         <Input
@@ -153,7 +380,7 @@ export function AdminRegistrationsPage() {
                   </td>
                   <td className="p-4">{statusBadge(reg.status)}</td>
                   <td className="p-4 text-gray-500 text-xs">{formatDate(reg.createdAt)}</td>
-                  <td className="p-4">
+                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -186,6 +413,19 @@ export function AdminRegistrationsPage() {
           </div>
         )}
       </div>
+
+      {/* Detail slide-over */}
+      {detailReg && (
+        <DetailModal
+          reg={detailReg}
+          onClose={() => setDetailReg(null)}
+          onEditBib={() => {
+            setEditingReg(detailReg);
+            setNewBib(String(detailReg.bibNumber ?? ""));
+            setDetailReg(null);
+          }}
+        />
+      )}
     </div>
   );
 }

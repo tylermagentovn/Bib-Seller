@@ -28,6 +28,7 @@ const eventSchema = z.object({
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Chỉ dùng chữ thường, số, dấu gạch"),
   description: z.string().min(1, "Bắt buộc"),
   rules: z.string().optional(),
+  disclaimer: z.string().optional(),
   imageUrl: z.string().optional(),
   location: z.string().optional(),
   eventDate: z.string().optional(),
@@ -66,6 +67,7 @@ export function AdminEventsPage() {
       slug: event.slug,
       description: event.description,
       rules: event.rules ?? "",
+      disclaimer: event.disclaimer ?? "",
       imageUrl: event.imageUrl ?? "",
       location: event.location ?? "",
       eventDate: event.eventDate ? event.eventDate.slice(0, 10) : "",
@@ -152,6 +154,14 @@ export function AdminEventsPage() {
                   <textarea
                     className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[60px] resize-none"
                     {...register("rules")}
+                  />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label>Bản miễn trừ trách nhiệm</Label>
+                  <textarea
+                    className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[100px] resize-none"
+                    placeholder="Nội dung miễn trừ trách nhiệm (người đăng ký sẽ phải đọc và ký sau khi thanh toán)"
+                    {...register("disclaimer")}
                   />
                 </div>
                 <div className="space-y-1.5">

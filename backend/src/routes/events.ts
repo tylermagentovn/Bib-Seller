@@ -62,6 +62,7 @@ const eventSchema = z.object({
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
   description: z.string().min(1),
   rules: z.string().optional(),
+  disclaimer: z.string().optional(),
   imageUrl: z.string().url().optional().or(z.literal("")),
   location: z.string().optional(),
   eventDate: z.string().optional(),
@@ -82,6 +83,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       ...eventData,
       eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
       imageUrl: eventData.imageUrl || null,
+      disclaimer: eventData.disclaimer || null,
       distances: {
         create: distances.map((d) => ({
           name: d.name,
@@ -129,6 +131,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
         ...eventData,
         eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
         imageUrl: eventData.imageUrl || null,
+        disclaimer: eventData.disclaimer || null,
       },
     });
 

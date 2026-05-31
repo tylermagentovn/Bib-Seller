@@ -154,6 +154,37 @@ router.get("/admin/all", requireAuth, async (req: Request, res: Response) => {
   res.json({ registrations, total, page: Number(page), limit: Number(limit) });
 });
 
+// Public: sign disclaimer
+router.post("/:id/sign-disclaimer", async (req: Request, res: Response) => {
+  const { signature } = req.body;
+  if (!signature || typeof signature !== "string") {
+    res.status(400).json({ error: "signature required" });
+    return;
+  }
+
+  const registration = await prisma.registration.findUnique({
+    where: { id: req.params.id as string },
+  });
+  if (!registration) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (registration.disclaimerSignedAt) {
+    res.status(409).json({ error: "Disclaimer already signed" });
+    return;
+  }
+
+  const updated = await prisma.registration.update({
+    where: { id: req.params.id as string },
+    data: {
+      disclaimerSignature: signature,
+      disclaimerSignedAt: new Date(),
+    },
+    include: { payment: true, distance: true, event: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
+  });
+  res.json(updated);
+});
+
 // Admin: update bib manually
 router.patch("/:id/bib", requireAuth, async (req: Request, res: Response) => {
   const { bibNumber } = req.body;
