@@ -282,6 +282,48 @@ router.patch("/:id/bib", requireAuth, async (req: Request, res: Response) => {
   res.json(registration);
 });
 
+// Admin: update registration status manually
+router.patch("/:id/status", requireAuth, async (req: Request, res: Response) => {
+  const { status } = req.body;
+  if (!["PENDING", "PAID", "CANCELLED"].includes(status)) {
+    res.status(400).json({ error: "Invalid status" });
+    return;
+  }
+
+  const registration = await prisma.registration.findUnique({
+    where: { id: req.params.id as string },
+    include: { payment: true },
+  });
+  if (!registration) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  if (status === "PAID" && registration.payment) {
+    await prisma.payment.update({
+      where: { registrationId: registration.id },
+      data: { status: "PAID", paidAt: registration.payment.paidAt ?? new Date() },
+    });
+  } else if (status === "CANCELLED" && registration.payment && registration.payment.status !== "PAID") {
+    await prisma.payment.update({
+      where: { registrationId: registration.id },
+      data: { status: "EXPIRED" },
+    });
+  } else if (status === "PENDING" && registration.payment) {
+    await prisma.payment.update({
+      where: { registrationId: registration.id },
+      data: { status: "PENDING", paidAt: null },
+    });
+  }
+
+  const updated = await prisma.registration.update({
+    where: { id: req.params.id as string },
+    data: { status },
+    include: { payment: true, distance: true, event: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
+  });
+  res.json(updated);
+});
+
 // Admin: send continue email (bulk)
 router.post("/admin/send-continue", requireAuth, async (req: Request, res: Response) => {
   const { ids } = req.body as { ids?: string[] };

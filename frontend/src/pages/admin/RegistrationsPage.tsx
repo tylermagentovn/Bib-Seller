@@ -9,12 +9,73 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Loader2, Pencil, ChevronLeft, ChevronRight, Search,
   X, User, Phone, Mail, Calendar, Shield, CreditCard,
-  PenLine, Users, CheckCircle, Clock, Download, Trash2,
+  PenLine, Users, CheckCircle, Clock, Download, Trash2, RefreshCw,
 } from "lucide-react";
 
 const PAGE_SIZE = 20;
 
-function DetailModal({ reg, onClose, onEditBib }: { reg: Registration; onClose: () => void; onEditBib: () => void }) {
+function ChangeStatusModal({ reg, onConfirm, onCancel, isPending }: {
+  reg: Registration;
+  onConfirm: (status: "PENDING" | "PAID" | "CANCELLED") => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const [newStatus, setNewStatus] = useState<"PENDING" | "PAID" | "CANCELLED">(reg.status);
+
+  const statusLabel = (s: string) => {
+    if (s === "PAID") return "Đã thanh toán";
+    if (s === "CANCELLED") return "Đã hủy";
+    return "Chờ thanh toán";
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+            <RefreshCw className="h-5 w-5 text-indigo-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">Cập nhật trạng thái</h3>
+            <p className="text-sm text-gray-500">{reg.fullName}</p>
+          </div>
+        </div>
+        <div className="mb-5">
+          <label className="text-sm font-medium text-gray-700 mb-1.5 block">Trạng thái mới</label>
+          <Select value={newStatus} onValueChange={(v) => setNewStatus(v as typeof newStatus)}>
+            <SelectTrigger>
+              <SelectValue>{statusLabel(newStatus)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="PENDING">Chờ thanh toán</SelectItem>
+              <SelectItem value="PAID">Đã thanh toán</SelectItem>
+              <SelectItem value="CANCELLED">Đã hủy</SelectItem>
+            </SelectContent>
+          </Select>
+          {newStatus === "PAID" && (
+            <p className="text-xs text-gray-400 mt-1.5">Trạng thái payment sẽ được cập nhật thành Đã TT tự động.</p>
+          )}
+        </div>
+        <div className="flex gap-3 justify-end">
+          <Button variant="outline" onClick={onCancel} disabled={isPending}>Hủy</Button>
+          <Button
+            onClick={() => onConfirm(newStatus)}
+            disabled={isPending || newStatus === reg.status}
+          >
+            {isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Đang lưu...</> : "Xác nhận"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailModal({ reg, onClose, onEditBib, onEditStatus }: {
+  reg: Registration;
+  onClose: () => void;
+  onEditBib: () => void;
+  onEditStatus: () => void;
+}) {
   const statusBadge = (s: string) => {
     if (s === "PAID") return <Badge variant="success">Đã thanh toán</Badge>;
     if (s === "CANCELLED") return <Badge variant="destructive">Đã hủy</Badge>;
@@ -45,6 +106,9 @@ function DetailModal({ reg, onClose, onEditBib }: { reg: Registration; onClose: 
             </div>
           </div>
           <div className="flex gap-2 items-center">
+            <Button size="sm" variant="outline" onClick={onEditStatus}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Đổi TT
+            </Button>
             <Button size="sm" variant="outline" onClick={onEditBib}>
               <Pencil className="h-3.5 w-3.5 mr-1" /> Sửa BIB
             </Button>
@@ -275,6 +339,7 @@ export function AdminRegistrationsPage() {
   const [search, setSearch] = useState("");
   const [detailReg, setDetailReg] = useState<Registration | null>(null);
   const [deletingReg, setDeletingReg] = useState<Registration | null>(null);
+  const [changingStatusReg, setChangingStatusReg] = useState<Registration | null>(null);
   const [exporting, setExporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -336,6 +401,15 @@ export function AdminRegistrationsPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-registrations"] });
       setDeletingReg(null);
       setDetailReg(null);
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "PENDING" | "PAID" | "CANCELLED" }) =>
+      api.patch(`/registrations/${id}/status`, { status }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-registrations"] });
+      setChangingStatusReg(null);
     },
   });
 
@@ -549,6 +623,19 @@ export function AdminRegistrationsPage() {
             setNewBib(String(detailReg.bibNumber ?? ""));
             setDetailReg(null);
           }}
+          onEditStatus={() => {
+            setChangingStatusReg(detailReg);
+            setDetailReg(null);
+          }}
+        />
+      )}
+
+      {changingStatusReg && (
+        <ChangeStatusModal
+          reg={changingStatusReg}
+          isPending={statusMutation.isPending}
+          onConfirm={(status) => statusMutation.mutate({ id: changingStatusReg.id, status })}
+          onCancel={() => setChangingStatusReg(null)}
         />
       )}
 
