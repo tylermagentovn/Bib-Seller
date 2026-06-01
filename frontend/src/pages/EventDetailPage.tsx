@@ -38,7 +38,7 @@ export function EventDetailPage() {
     );
   }
 
-  const pageTitle = `${event.name} — Song Ngư Club`;
+  const pageTitle = `${event.name} — Bib1s - Nền tảng đăng ký BIB giải đấu miễn phí`;
   const pageDescription = event.description.slice(0, 160);
   const pageImage = event.imageUrl || "https://songngu.info/banner.jpg";
   const pageUrl = `https://songngu.info/events/${event.slug}`;
