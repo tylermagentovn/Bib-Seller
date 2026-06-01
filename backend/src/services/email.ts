@@ -81,3 +81,45 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData) {
     html,
   });
 }
+
+interface ContinueEmailData {
+  to: string;
+  fullName: string;
+  registrationId: string;
+  eventName: string;
+}
+
+export async function sendContinueEmail(data: ContinueEmailData) {
+  const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
+  const link = `${frontend.replace(/\/$/, "")}/payment/${data.registrationId}/success?code=00`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:0}
+        .card{max-width:600px;margin:32px auto;background:#fff;padding:24px;border-radius:8px}
+        .btn{display:inline-block;padding:12px 18px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none}
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h2>Cảm ơn đã đăng ký sự kiện: ${data.eventName}</h2>
+        <p>Xin chào <strong>${data.fullName}</strong>,</p>
+        <p>Bạn đã hoàn tất thanh toán. Vui lòng bấm nút bên dưới để tiếp tục ký miễn trừ trách nhiệm và quay BIB.</p>
+        <p style="text-align:center;margin:22px 0;"><a class="btn" href="${link}">Ký miễn trừ & Quay BIB</a></p>
+        <p style="color:#888;font-size:12px">Nếu nút không hoạt động, sao chép đường dẫn sau vào trình duyệt của bạn:<br/><a href="${link}">${link}</a></p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: data.to,
+    subject: `Tiếp tục ký miễn trừ - ${data.eventName}`,
+    html,
+  });
+}

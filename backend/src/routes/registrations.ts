@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { appendRegistrationToSheet } from "../services/sheets";
+import { sendContinueEmail } from "../services/email";
 
 const router = Router();
 
@@ -279,6 +280,28 @@ router.patch("/:id/bib", requireAuth, async (req: Request, res: Response) => {
     include: { distance: true, event: true },
   });
   res.json(registration);
+});
+
+// Admin: send continue email (bulk)
+router.post("/admin/send-continue", requireAuth, async (req: Request, res: Response) => {
+  const { ids } = req.body as { ids?: string[] };
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: "ids required" });
+    return;
+  }
+
+  const registrations = await prisma.registration.findMany({
+    where: { id: { in: ids } },
+    include: { event: true },
+  });
+
+  const targets = registrations.filter((r) => r.status === "PAID" && !r.disclaimerSignedAt && r.email);
+
+  await Promise.all(targets.map((r) =>
+    sendContinueEmail({ to: r.email, fullName: r.fullName, registrationId: r.id, eventName: r.event.name })
+  ));
+
+  res.json({ sent: targets.length });
 });
 
 export default router;
