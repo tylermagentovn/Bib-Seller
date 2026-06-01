@@ -251,6 +251,79 @@ router.post("/:id/sign-disclaimer", async (req: Request, res: Response) => {
   res.json(updated);
 });
 
+// Admin: update registration info
+router.put("/:id", requireAuth, async (req: Request, res: Response) => {
+  const updateSchema = z.object({
+    fullName: z.string().min(1),
+    phone: z.string().min(9),
+    email: z.string().email(),
+    dob: z.string(),
+    emergencyName: z.string().min(1),
+    emergencyPhone: z.string().min(9),
+    teamMembers: z
+      .array(
+        z.object({
+          fullName: z.string().min(1),
+          phone: z.string().min(9),
+          email: z.string().email().optional().or(z.literal("")),
+          dob: z.string(),
+        })
+      )
+      .optional(),
+  });
+
+  const parsed = updateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const id = req.params.id as string;
+  const { teamMembers, ...data } = parsed.data;
+
+  const registration = await prisma.registration.findUnique({
+    where: { id },
+    include: { distance: true },
+  });
+  if (!registration) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.registration.update({
+      where: { id },
+      data: { ...data, dob: new Date(data.dob) },
+    });
+
+    if (registration.distance.type === "RELAY" && teamMembers) {
+      await tx.teamMember.deleteMany({ where: { registrationId: id } });
+      await tx.teamMember.createMany({
+        data: teamMembers.map((m, i) => ({
+          registrationId: id,
+          memberIndex: i + 1,
+          fullName: m.fullName,
+          phone: m.phone,
+          email: m.email || null,
+          dob: new Date(m.dob),
+        })),
+      });
+    }
+
+    return tx.registration.findUnique({
+      where: { id },
+      include: {
+        payment: true,
+        distance: true,
+        event: true,
+        teamMembers: { orderBy: { memberIndex: "asc" } },
+      },
+    });
+  });
+
+  res.json(updated);
+});
+
 // Admin: delete registration
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   const id = req.params.id as string;

@@ -70,11 +70,151 @@ function ChangeStatusModal({ reg, onConfirm, onCancel, isPending }: {
   );
 }
 
-function DetailModal({ reg, onClose, onEditBib, onEditStatus }: {
+function EditInfoModal({ reg, onClose }: {
+  reg: Registration;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const [fullName, setFullName] = useState(reg.fullName);
+  const [phone, setPhone] = useState(reg.phone);
+  const [email, setEmail] = useState(reg.email);
+  const [dob, setDob] = useState(reg.dob.slice(0, 10));
+  const [emergencyName, setEmergencyName] = useState(reg.emergencyName);
+  const [emergencyPhone, setEmergencyPhone] = useState(reg.emergencyPhone);
+  const [teamMembers, setTeamMembers] = useState(
+    reg.teamMembers.map((m) => ({
+      fullName: m.fullName,
+      phone: m.phone,
+      email: m.email ?? "",
+      dob: m.dob.slice(0, 10),
+    }))
+  );
+
+  const mutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      api.put(`/registrations/${reg.id}`, data).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-registrations"] });
+      onClose();
+    },
+  });
+
+  const handleSubmit = () => {
+    const payload: Record<string, unknown> = { fullName, phone, email, dob, emergencyName, emergencyPhone };
+    if (reg.distance.type === "RELAY") payload.teamMembers = teamMembers;
+    mutation.mutate(payload);
+  };
+
+  const updateMember = (i: number, field: string, value: string) => {
+    setTeamMembers((prev) => prev.map((m, idx) => (idx === i ? { ...m, [field]: value } : m)));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-semibold text-gray-900 text-lg">Sửa thông tin đăng ký</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <p className="text-xs text-gray-500 -mt-2 mb-1">{reg.event.name} — {reg.distance.name}</p>
+
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Thông tin cá nhân</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Họ tên</label>
+              <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Ngày sinh</label>
+              <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Liên hệ khẩn cấp</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Họ tên</label>
+                <Input value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
+                <Input value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
+              </div>
+            </div>
+          </div>
+
+          {reg.distance.type === "RELAY" && teamMembers.length > 0 && (
+            <div className="border-t pt-4">
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                Thành viên nhóm
+              </h4>
+              <div className="space-y-3">
+                {teamMembers.map((m, i) => (
+                  <div key={i} className="bg-gray-50 rounded-xl p-3 space-y-2">
+                    <div className="text-xs font-semibold text-gray-600">Thành viên {i + 1}</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="col-span-2">
+                        <label className="text-xs text-gray-500 mb-1 block">Họ tên</label>
+                        <Input className="h-8 text-sm" value={m.fullName} onChange={(e) => updateMember(i, "fullName", e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Ngày sinh</label>
+                        <Input className="h-8 text-sm" type="date" value={m.dob} onChange={(e) => updateMember(i, "dob", e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Điện thoại</label>
+                        <Input className="h-8 text-sm" value={m.phone} onChange={(e) => updateMember(i, "phone", e.target.value)} />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-xs text-gray-500 mb-1 block">Email</label>
+                        <Input className="h-8 text-sm" type="email" value={m.email} onChange={(e) => updateMember(i, "email", e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {mutation.isError && (
+          <p className="text-sm text-red-500 mt-3">Lưu thất bại. Vui lòng kiểm tra lại thông tin.</p>
+        )}
+
+        <div className="flex gap-3 justify-end mt-6">
+          <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>Hủy</Button>
+          <Button onClick={handleSubmit} disabled={mutation.isPending}>
+            {mutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Đang lưu...</> : "Lưu thay đổi"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailModal({ reg, onClose, onEditBib, onEditStatus, onEditInfo }: {
   reg: Registration;
   onClose: () => void;
   onEditBib: () => void;
   onEditStatus: () => void;
+  onEditInfo: () => void;
 }) {
   const statusBadge = (s: string) => {
     if (s === "PAID") return <Badge variant="success">Đã thanh toán</Badge>;
@@ -106,6 +246,9 @@ function DetailModal({ reg, onClose, onEditBib, onEditStatus }: {
             </div>
           </div>
           <div className="flex gap-2 items-center">
+            <Button size="sm" variant="outline" onClick={onEditInfo}>
+              <Pencil className="h-3.5 w-3.5 mr-1" /> Sửa TT
+            </Button>
             <Button size="sm" variant="outline" onClick={onEditStatus}>
               <RefreshCw className="h-3.5 w-3.5 mr-1" /> Đổi TT
             </Button>
@@ -340,6 +483,7 @@ export function AdminRegistrationsPage() {
   const [detailReg, setDetailReg] = useState<Registration | null>(null);
   const [deletingReg, setDeletingReg] = useState<Registration | null>(null);
   const [changingStatusReg, setChangingStatusReg] = useState<Registration | null>(null);
+  const [editingInfoReg, setEditingInfoReg] = useState<Registration | null>(null);
   const [exporting, setExporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -627,6 +771,10 @@ export function AdminRegistrationsPage() {
             setChangingStatusReg(detailReg);
             setDetailReg(null);
           }}
+          onEditInfo={() => {
+            setEditingInfoReg(detailReg);
+            setDetailReg(null);
+          }}
         />
       )}
 
@@ -636,6 +784,13 @@ export function AdminRegistrationsPage() {
           isPending={statusMutation.isPending}
           onConfirm={(status) => statusMutation.mutate({ id: changingStatusReg.id, status })}
           onCancel={() => setChangingStatusReg(null)}
+        />
+      )}
+
+      {editingInfoReg && (
+        <EditInfoModal
+          reg={editingInfoReg}
+          onClose={() => setEditingInfoReg(null)}
         />
       )}
 
