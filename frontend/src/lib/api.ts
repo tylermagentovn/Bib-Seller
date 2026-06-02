@@ -46,7 +46,13 @@ export interface TeamMember {
   fullName: string;
   phone: string;
   email: string | null;
-  dob: string;
+  dob: string | null;
+  idNumber: string | null;
+  shirtSize: string | null;
+  bloodType: string | null;
+  medicalConditions: string | null;
+  emergencyName: string | null;
+  emergencyPhone: string | null;
   createdAt: string;
 }
 

@@ -457,7 +457,29 @@ export function AdminEventsPage() {
                       {watch(`distances.${i}.type`) === "RELAY" && (
                         <div className="space-y-1">
                           <Label className="text-xs">Số TV</Label>
-                          <Input className="h-8 text-sm" type="number" placeholder="4" {...register(`distances.${i}.teamSize`, { valueAsNumber: true })} />
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="h-3.5 w-3.5"
+                              checked={watch(`distances.${i}.teamSize`) == null}
+                              onChange={(e) => setValue(`distances.${i}.teamSize`, e.target.checked ? null : 2)}
+                            />
+                            <span className="text-xs text-gray-600">Tùy chọn (≤6)</span>
+                          </label>
+                          {watch(`distances.${i}.teamSize`) != null && (
+                            <Input
+                              className="h-8 text-sm"
+                              type="number"
+                              placeholder="4"
+                              min={2}
+                              max={6}
+                              value={watch(`distances.${i}.teamSize`) ?? ""}
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value);
+                                setValue(`distances.${i}.teamSize`, isNaN(v) ? 2 : v);
+                              }}
+                            />
+                          )}
                           {errors.distances?.[i]?.teamSize && <p className="text-xs text-red-500">{errors.distances[i].teamSize?.message}</p>}
                         </div>
                       )}

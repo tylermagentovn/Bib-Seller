@@ -11,7 +11,13 @@ const teamMemberSchema = z.object({
   fullName: z.string().min(1),
   phone: z.string().min(9),
   email: z.string().email().optional().or(z.literal("")),
-  dob: z.string(),
+  dob: z.string().optional(),
+  idNumber: z.string().nullable().optional(),
+  shirtSize: z.string().nullable().optional(),
+  bloodType: z.string().nullable().optional(),
+  medicalConditions: z.string().nullable().optional(),
+  emergencyName: z.string().nullable().optional(),
+  emergencyPhone: z.string().nullable().optional(),
 });
 
 const registrationSchema = z.object({
@@ -70,9 +76,16 @@ router.post("/", async (req: Request, res: Response) => {
 
   // Validate team members for RELAY distances
   if (distance.type === "RELAY") {
-    const required = distance.teamSize ?? 2;
-    if (!data.teamMembers || data.teamMembers.length !== required) {
-      res.status(400).json({ error: `Cu ly tiep suc yeu cau dung ${required} thanh vien` });
+    if (!data.teamMembers || data.teamMembers.length === 0) {
+      res.status(400).json({ error: "Cu ly tiep suc yeu cau it nhat 1 thanh vien" });
+      return;
+    }
+    if (distance.teamSize !== null && data.teamMembers.length !== distance.teamSize) {
+      res.status(400).json({ error: `Cu ly tiep suc yeu cau dung ${distance.teamSize} thanh vien` });
+      return;
+    }
+    if (data.teamMembers.length > 6) {
+      res.status(400).json({ error: "Cu ly tiep suc tuy chon toi da 6 thanh vien" });
       return;
     }
   }
@@ -110,7 +123,13 @@ router.post("/", async (req: Request, res: Response) => {
                 fullName: m.fullName,
                 phone: m.phone,
                 email: m.email || null,
-                dob: new Date(m.dob),
+                dob: m.dob ? new Date(m.dob) : null,
+                idNumber: m.idNumber ?? null,
+                shirtSize: m.shirtSize ?? null,
+                bloodType: m.bloodType ?? null,
+                medicalConditions: m.medicalConditions ?? null,
+                emergencyName: m.emergencyName ?? null,
+                emergencyPhone: m.emergencyPhone ?? null,
               })),
             },
           }
@@ -297,16 +316,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     medicalConditions: z.string().nullable().optional(),
     emergencyName: z.string().optional(),
     emergencyPhone: z.string().optional(),
-    teamMembers: z
-      .array(
-        z.object({
-          fullName: z.string().min(1),
-          phone: z.string().min(9),
-          email: z.string().email().optional().or(z.literal("")),
-          dob: z.string(),
-        })
-      )
-      .optional(),
+    teamMembers: z.array(teamMemberSchema).optional(),
   });
 
   const parsed = updateSchema.safeParse(req.body);
@@ -348,7 +358,13 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
           fullName: m.fullName,
           phone: m.phone,
           email: m.email || null,
-          dob: new Date(m.dob),
+          dob: m.dob ? new Date(m.dob) : null,
+          idNumber: m.idNumber ?? null,
+          shirtSize: m.shirtSize ?? null,
+          bloodType: m.bloodType ?? null,
+          medicalConditions: m.medicalConditions ?? null,
+          emergencyName: m.emergencyName ?? null,
+          emergencyPhone: m.emergencyPhone ?? null,
         })),
       });
     }

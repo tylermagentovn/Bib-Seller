@@ -91,14 +91,20 @@ model Registration {
 }
 
 model TeamMember {
-  id             String       @id @default(cuid())
-  registrationId String
-  memberIndex    Int
-  fullName       String
-  phone          String
-  email          String?
-  dob            DateTime
-  createdAt      DateTime     @default(now())
+  id                String    @id @default(cuid())
+  registrationId    String
+  memberIndex       Int
+  fullName          String
+  phone             String
+  email             String?
+  dob               DateTime?
+  idNumber          String?
+  shirtSize         String?
+  bloodType         String?
+  medicalConditions String?
+  emergencyName     String?
+  emergencyPhone    String?
+  createdAt         DateTime  @default(now())
 
   registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 

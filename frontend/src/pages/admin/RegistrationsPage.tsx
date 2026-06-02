@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Registration } from "@/lib/api";
+import { api, type Registration, type TeamMember } from "@/lib/api";
+import { MEMBER_FIELD_DEFS, SHIRT_SIZES, BLOOD_TYPES, initFieldValue, normalizeFieldValue } from "@/lib/memberFields";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,9 +13,6 @@ import {
   PenLine, Users, CheckCircle, Clock, Download, Trash2, RefreshCw,
   BadgeCheck, Shirt, Droplets, HeartPulse,
 } from "lucide-react";
-
-const SHIRT_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
-const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Không biết"];
 
 const PAGE_SIZE = 20;
 
@@ -74,6 +72,43 @@ function ChangeStatusModal({ reg, onConfirm, onCancel, isPending }: {
   );
 }
 
+type MemberEditState = Record<string, string>;
+
+function renderMemberField(
+  def: (typeof MEMBER_FIELD_DEFS)[number],
+  value: string,
+  onChange: (v: string) => void
+) {
+  if (def.type === "select") {
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Chọn" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="_none_">—</SelectItem>
+          {def.options?.map((opt) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    );
+  }
+  if (def.type === "textarea") {
+    return (
+      <textarea
+        className="w-full border border-gray-200 rounded-md px-3 py-2 text-xs min-h-[52px] focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+  return (
+    <Input
+      className="h-8 text-sm"
+      type={def.type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
 function EditInfoModal({ reg, onClose }: {
   reg: Registration;
   onClose: () => void;
@@ -90,12 +125,19 @@ function EditInfoModal({ reg, onClose }: {
   const [medicalConditions, setMedicalConditions] = useState(reg.medicalConditions ?? "");
   const [emergencyName, setEmergencyName] = useState(reg.emergencyName ?? "");
   const [emergencyPhone, setEmergencyPhone] = useState(reg.emergencyPhone ?? "");
-  const [teamMembers, setTeamMembers] = useState(
+  const isRelay = reg.distance.type === "RELAY";
+
+  const [teamMembers, setTeamMembers] = useState<MemberEditState[]>(
     reg.teamMembers.map((m) => ({
       fullName: m.fullName,
       phone: m.phone,
       email: m.email ?? "",
-      dob: m.dob.slice(0, 10),
+      ...Object.fromEntries(
+        MEMBER_FIELD_DEFS.map((f) => [
+          f.key,
+          initFieldValue(f, m[f.key as keyof TeamMember] as string | null),
+        ])
+      ),
     }))
   );
 
@@ -109,15 +151,26 @@ function EditInfoModal({ reg, onClose }: {
   });
 
   const handleSubmit = () => {
-    const payload: Record<string, unknown> = {
-      fullName, phone, email, dob,
-      idNumber: idNumber || null,
-      shirtSize: shirtSize === "_none_" ? null : shirtSize || null,
-      bloodType: bloodType === "_none_" ? null : bloodType || null,
-      medicalConditions: medicalConditions || null,
-      emergencyName, emergencyPhone,
-    };
-    if (reg.distance.type === "RELAY") payload.teamMembers = teamMembers;
+    const payload: Record<string, unknown> = { fullName, phone, email };
+    if (!isRelay) {
+      payload.dob = dob;
+      payload.idNumber = idNumber || null;
+      payload.shirtSize = shirtSize === "_none_" ? null : shirtSize || null;
+      payload.bloodType = bloodType === "_none_" ? null : bloodType || null;
+      payload.medicalConditions = medicalConditions || null;
+      payload.emergencyName = emergencyName || null;
+      payload.emergencyPhone = emergencyPhone || null;
+    }
+    if (isRelay) {
+      payload.teamMembers = teamMembers.map((m) => ({
+        fullName: m.fullName,
+        phone: m.phone,
+        email: m.email || null,
+        ...Object.fromEntries(
+          MEMBER_FIELD_DEFS.map((f) => [f.key, normalizeFieldValue(f, m[f.key] ?? f.defaultValue)])
+        ),
+      }));
+    }
     mutation.mutate(payload);
   };
 
@@ -141,80 +194,101 @@ function EditInfoModal({ reg, onClose }: {
         <div className="space-y-4">
           <p className="text-xs text-gray-500 -mt-2 mb-1">{reg.event.name} — {reg.distance.name}</p>
 
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Thông tin cá nhân</h4>
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            {isRelay ? "Thông tin đội trưởng" : "Thông tin cá nhân"}
+          </h4>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="text-sm font-medium text-gray-700 mb-1 block">Họ tên</label>
               <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Ngày sinh</label>
-              <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            <div className="col-span-2">
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
+            {isRelay ? (
+              <>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
+                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Ngày sinh</label>
+                  <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
+                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="border-t pt-4">
-            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Thông tin bổ sung</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Số CCCD</label>
-                <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Nhập số CCCD" />
+          {!isRelay && (
+            <>
+              <div className="border-t pt-4">
+                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Thông tin bổ sung</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Số CCCD</label>
+                    <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Nhập số CCCD" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Size áo</label>
+                    <Select value={shirtSize} onValueChange={setShirtSize}>
+                      <SelectTrigger><SelectValue placeholder="Chọn size" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none_">—</SelectItem>
+                        {SHIRT_SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Nhóm máu</label>
+                    <Select value={bloodType} onValueChange={setBloodType}>
+                      <SelectTrigger><SelectValue placeholder="Chọn nhóm máu" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none_">—</SelectItem>
+                        {BLOOD_TYPES.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Bệnh lý</label>
+                    <textarea
+                      className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm min-h-[72px] focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                      value={medicalConditions}
+                      onChange={(e) => setMedicalConditions(e.target.value)}
+                      placeholder="Ghi chú bệnh lý..."
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Size áo</label>
-                <Select value={shirtSize} onValueChange={setShirtSize}>
-                  <SelectTrigger><SelectValue placeholder="Chọn size" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none_">—</SelectItem>
-                    {SHIRT_SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Nhóm máu</label>
-                <Select value={bloodType} onValueChange={setBloodType}>
-                  <SelectTrigger><SelectValue placeholder="Chọn nhóm máu" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none_">—</SelectItem>
-                    {BLOOD_TYPES.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-2">
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Bệnh lý</label>
-                <textarea
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm min-h-[72px] focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                  value={medicalConditions}
-                  onChange={(e) => setMedicalConditions(e.target.value)}
-                  placeholder="Ghi chú bệnh lý..."
-                />
-              </div>
-            </div>
-          </div>
 
-          <div className="border-t pt-4">
-            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Liên hệ khẩn cấp</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Họ tên</label>
-                <Input value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} />
+              <div className="border-t pt-4">
+                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Liên hệ khẩn cấp</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Họ tên</label>
+                    <Input value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
+                    <Input value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
-                <Input value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
-              </div>
-            </div>
-          </div>
+            </>
+          )}
 
-          {reg.distance.type === "RELAY" && teamMembers.length > 0 && (
+          {isRelay && teamMembers.length > 0 && (
             <div className="border-t pt-4">
               <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
                 Thành viên nhóm
@@ -229,17 +303,19 @@ function EditInfoModal({ reg, onClose }: {
                         <Input className="h-8 text-sm" value={m.fullName} onChange={(e) => updateMember(i, "fullName", e.target.value)} />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Ngày sinh</label>
-                        <Input className="h-8 text-sm" type="date" value={m.dob} onChange={(e) => updateMember(i, "dob", e.target.value)} />
-                      </div>
-                      <div>
                         <label className="text-xs text-gray-500 mb-1 block">Điện thoại</label>
                         <Input className="h-8 text-sm" value={m.phone} onChange={(e) => updateMember(i, "phone", e.target.value)} />
                       </div>
-                      <div className="col-span-2">
+                      <div>
                         <label className="text-xs text-gray-500 mb-1 block">Email</label>
                         <Input className="h-8 text-sm" type="email" value={m.email} onChange={(e) => updateMember(i, "email", e.target.value)} />
                       </div>
+                      {MEMBER_FIELD_DEFS.map((def) => (
+                        <div key={def.key} className={def.type === "textarea" ? "col-span-2" : ""}>
+                          <label className="text-xs text-gray-500 mb-1 block">{def.label}</label>
+                          {renderMemberField(def, m[def.key] ?? def.defaultValue, (v) => updateMember(i, def.key, v))}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -454,10 +530,22 @@ function DetailModal({ reg, onClose, onEditBib, onEditStatus, onEditInfo }: {
                         <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{m.phone}</span>
                         {m.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{m.email}</span>}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Ngày sinh: {formatDate(m.dob)}
-                      </div>
+                      {MEMBER_FIELD_DEFS.map((def) => {
+                        const val = m[def.key as keyof TeamMember] as string | null;
+                        if (!val) return null;
+                        const Icon = def.displayIcon;
+                        return (
+                          <div
+                            key={def.key}
+                            className={def.type === "textarea" ? "flex items-start gap-1" : "flex items-center gap-1"}
+                          >
+                            {Icon && <Icon className={`h-3 w-3 flex-shrink-0 ${def.type === "textarea" ? "mt-0.5" : ""}`} />}
+                            <span className={def.type === "textarea" ? "break-words" : ""}>
+                              {def.key === "dob" ? formatDate(val) : val}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
