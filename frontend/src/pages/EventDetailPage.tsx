@@ -166,6 +166,29 @@ export function EventDetailPage() {
             <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{event.description}</p>
           </div>
 
+          {event.shirtSizeImageUrl && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border">
+              <h2 className="font-semibold text-gray-900 text-lg mb-3">Bảng size áo</h2>
+              <div className="flex flex-wrap gap-4 items-start justify-center">
+                {event.shirtSizeImageUrl.split(",").map((url, i) => (
+                  <img key={i} src={url.trim()} alt="Bảng size áo" className="max-h-80 w-auto object-contain" />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {event.raceKitImageUrl && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border">
+              <h2 className="font-semibold text-gray-900 text-lg mb-3">Race Kit</h2>
+              <div className="flex flex-wrap gap-4 items-start justify-center">
+                {event.raceKitImageUrl.split(",").map((url, i) => (
+                  <img key={i} src={url.trim()} alt="Race Kit" className="max-h-80 w-auto object-contain" />
+                ))}
+              </div>
+              {event.raceKitDescription && <p className="text-gray-600 leading-relaxed whitespace-pre-wrap text-sm mt-4">{event.raceKitDescription}</p>}
+            </div>
+          )}
+
           {event.rules && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border">
               <h2 className="font-semibold text-gray-900 text-lg mb-3">Quy định tham gia</h2>

@@ -66,7 +66,10 @@ const eventSchema = z.object({
   description: z.string().min(1),
   rules: z.string().optional(),
   disclaimer: z.string().optional(),
-  imageUrl: z.string().url().optional().or(z.literal("")),
+  imageUrl: z.string().optional().or(z.literal("")),
+  shirtSizeImageUrl: z.string().optional().or(z.literal("")),
+  raceKitImageUrl: z.string().optional().or(z.literal("")),
+  raceKitDescription: z.string().optional(),
   location: z.string().optional(),
   eventDate: z.string().optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "CLOSED"]).default("DRAFT"),
@@ -81,11 +84,14 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 
   const { distances, ...eventData } = parsed.data;
-  const event = await prisma.event.create({
+    const event = await prisma.event.create({
     data: {
       ...eventData,
       eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
       imageUrl: eventData.imageUrl || null,
+        shirtSizeImageUrl: eventData.shirtSizeImageUrl || null,
+        raceKitImageUrl: eventData.raceKitImageUrl || null,
+        raceKitDescription: eventData.raceKitDescription || null,
       disclaimer: eventData.disclaimer || null,
       createdById: req.adminId,
       distances: {
@@ -144,6 +150,9 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
         ...eventData,
         eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
         imageUrl: eventData.imageUrl || null,
+        shirtSizeImageUrl: eventData.shirtSizeImageUrl || null,
+        raceKitImageUrl: eventData.raceKitImageUrl || null,
+        raceKitDescription: eventData.raceKitDescription || null,
         disclaimer: eventData.disclaimer || null,
       },
     });

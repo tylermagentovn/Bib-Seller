@@ -26,6 +26,9 @@ model Event {
   rules       String?
   disclaimer  String?
   imageUrl    String?
+  shirtSizeImageUrl String?
+  raceKitImageUrl String?
+  raceKitDescription String?
   location    String?
   eventDate   DateTime?
   status      EventStatus @default(DRAFT)

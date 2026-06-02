@@ -1,10 +1,12 @@
 import "dotenv/config";
 import "express-async-errors";
 import express, { Request, Response, NextFunction } from "express";
+import path from "path";
 import cors from "cors";
 
 import authRouter from "./routes/auth";
 import eventsRouter from "./routes/events";
+import uploadsRouter from "./routes/uploads";
 import registrationsRouter from "./routes/registrations";
 import paymentsRouter from "./routes/payments";
 import { prisma } from "./lib/prisma";
@@ -15,8 +17,12 @@ const PORT = process.env.PORT ?? 3001;
 app.use(cors({ origin: process.env.FRONTEND_URL ?? "*" }));
 app.use(express.json());
 
+// Serve uploaded files
+app.use("/uploads", express.static(path.join(__dirname, "..", "public", "uploads")));
+
 app.use("/api/auth", authRouter);
 app.use("/api/events", eventsRouter);
+app.use("/api/uploads", uploadsRouter);
 app.use("/api/registrations", registrationsRouter);
 app.use("/api/payments", paymentsRouter);
 

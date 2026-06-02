@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, X, Loader2, Calendar, MapPin } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2, Calendar, MapPin, Upload } from "lucide-react";
 
 const distanceSchema = z.object({
   id: z.string().optional(),
@@ -30,6 +30,9 @@ const eventSchema = z.object({
   rules: z.string().optional(),
   disclaimer: z.string().optional(),
   imageUrl: z.string().optional(),
+  shirtSizeImageUrl: z.string().optional(),
+  raceKitImageUrl: z.string().optional(),
+  raceKitDescription: z.string().optional(),
   location: z.string().optional(),
   eventDate: z.string().optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "CLOSED"]),
@@ -50,13 +53,25 @@ export function AdminEventsPage() {
 
   const { register, handleSubmit, control, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(eventSchema),
-    defaultValues: { status: "DRAFT", distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
+    defaultValues: { status: "DRAFT", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "distances" });
+  const [uploading, setUploading] = useState(false);
+  const [uploadingRace, setUploadingRace] = useState(false);
+  const [shirtUploadedUrls, setShirtUploadedUrls] = useState<string[]>([]);
+  const [raceKitUploadedUrls, setRaceKitUploadedUrls] = useState<string[]>([]);
+  const shirtInputRef = useRef<HTMLInputElement>(null);
+  const raceKitInputRef = useRef<HTMLInputElement>(null);
+  const [shirtSizeUrl, setShirtSizeUrl] = useState("");
+  const [raceKitUrl, setRaceKitUrl] = useState("");
 
   const openCreate = () => {
-    reset({ status: "DRAFT", distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
+    reset({ status: "DRAFT", raceKitDescription: "", distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
+    setShirtSizeUrl("");
+    setRaceKitUrl("");
+    setShirtUploadedUrls([]);
+    setRaceKitUploadedUrls([]);
     setEditing(null);
     setShowForm(true);
   };
@@ -69,6 +84,9 @@ export function AdminEventsPage() {
       rules: event.rules ?? "",
       disclaimer: event.disclaimer ?? "",
       imageUrl: event.imageUrl ?? "",
+      shirtSizeImageUrl: (event as any).shirtSizeImageUrl ?? "",
+      raceKitImageUrl: (event as any).raceKitImageUrl ?? "",
+      raceKitDescription: (event as any).raceKitDescription ?? "",
       location: event.location ?? "",
       eventDate: event.eventDate ? event.eventDate.slice(0, 10) : "",
       status: event.status,
@@ -83,6 +101,10 @@ export function AdminEventsPage() {
         teamSize: d.teamSize ?? null,
       })),
     });
+    setShirtSizeUrl((event as any).shirtSizeImageUrl ?? "");
+    setRaceKitUrl((event as any).raceKitImageUrl ?? "");
+    setShirtUploadedUrls([]);
+    setRaceKitUploadedUrls([]);
     setEditing(event);
     setShowForm(true);
   };
@@ -129,7 +151,7 @@ export function AdminEventsPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit((d) => saveMutation.mutate(d))} className="p-5 space-y-4">
+            <form onSubmit={handleSubmit((d) => saveMutation.mutate({ ...d, shirtSizeImageUrl: shirtSizeUrl, raceKitImageUrl: raceKitUrl }))} className="p-5 space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Tên sự kiện *</Label>
@@ -175,6 +197,147 @@ export function AdminEventsPage() {
                 <div className="space-y-1.5">
                   <Label>URL hình ảnh</Label>
                   <Input {...register("imageUrl")} placeholder="https://..." />
+                </div>
+                {/* Shirt size image — full row */}
+                <div className="space-y-2 md:col-span-2 border rounded-xl p-4 bg-gray-50">
+                  <Label className="text-sm font-medium">Ảnh bảng size áo</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={shirtSizeUrl}
+                      onChange={(e) => setShirtSizeUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={uploading}
+                      onClick={() => shirtInputRef.current?.click()}
+                    >
+                      {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      <span className="ml-1.5">{uploading ? "Đang tải..." : "Tải ảnh lên"}</span>
+                    </Button>
+                    <input
+                      ref={shirtInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files ?? []);
+                        if (!files.length) return;
+                        setUploading(true);
+                        try {
+                          const urls = await Promise.all(files.map(async (f) => {
+                            const fd = new FormData();
+                            fd.append("file", f);
+                            const res = await api.post("/uploads", fd, { headers: { "Content-Type": "multipart/form-data" } });
+                            return res.data.url as string;
+                          }));
+                          setShirtSizeUrl(urls.join(","));
+                          setShirtUploadedUrls(urls);
+                        } catch (err) {
+                          console.error(err);
+                          alert("Upload thất bại");
+                        } finally {
+                          setUploading(false);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                  </div>
+                  {shirtUploadedUrls.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500">Đã tải lên {shirtUploadedUrls.length} ảnh — bấm để chọn URL:</p>
+                      {shirtUploadedUrls.map((url, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setShirtSizeUrl(url)}
+                          className="block w-full text-left text-xs text-indigo-600 hover:text-indigo-800 truncate bg-white border rounded px-2 py-1"
+                        >
+                          {url}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Race kit image + description — full row */}
+                <div className="space-y-2 md:col-span-2 border rounded-xl p-4 bg-gray-50">
+                  <Label className="text-sm font-medium">Race Kit</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={raceKitUrl}
+                      onChange={(e) => setRaceKitUrl(e.target.value)}
+                      placeholder="https://... (ảnh race kit)"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={uploadingRace}
+                      onClick={() => raceKitInputRef.current?.click()}
+                    >
+                      {uploadingRace ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      <span className="ml-1.5">{uploadingRace ? "Đang tải..." : "Tải ảnh lên"}</span>
+                    </Button>
+                    <input
+                      ref={raceKitInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files ?? []);
+                        if (!files.length) return;
+                        setUploadingRace(true);
+                        try {
+                          const urls = await Promise.all(files.map(async (f) => {
+                            const fd = new FormData();
+                            fd.append("file", f);
+                            const res = await api.post("/uploads", fd, { headers: { "Content-Type": "multipart/form-data" } });
+                            return res.data.url as string;
+                          }));
+                          setRaceKitUrl(urls.join(","));
+                          setRaceKitUploadedUrls(urls);
+                        } catch (err) {
+                          console.error(err);
+                          alert("Upload thất bại");
+                        } finally {
+                          setUploadingRace(false);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                  </div>
+                  {raceKitUploadedUrls.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500">Đã tải lên {raceKitUploadedUrls.length} ảnh — bấm để chọn URL:</p>
+                      {raceKitUploadedUrls.map((url, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setRaceKitUrl(url)}
+                          className="block w-full text-left text-xs text-indigo-600 hover:text-indigo-800 truncate bg-white border rounded px-2 py-1"
+                        >
+                          {url}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="space-y-1 pt-1">
+                    <Label className="text-xs text-gray-500">Mô tả Race Kit</Label>
+                    <textarea
+                      className="flex w-full rounded-lg border border-input bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[60px] resize-none"
+                      placeholder="Mô tả nội dung race kit..."
+                      {...register("raceKitDescription")}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Trạng thái</Label>
@@ -284,6 +447,7 @@ export function AdminEventsPage() {
                 ) : (
                   <div className="w-20 h-14 bg-indigo-100 rounded-xl flex-shrink-0" />
                 )}
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-gray-900">{event.name}</span>

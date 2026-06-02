@@ -56,6 +56,9 @@ export interface Event {
   rules: string | null;
   disclaimer: string | null;
   imageUrl: string | null;
+  shirtSizeImageUrl: string | null;
+  raceKitImageUrl: string | null;
+  raceKitDescription: string | null;
   location: string | null;
   eventDate: string | null;
   status: "DRAFT" | "PUBLISHED" | "CLOSED";
