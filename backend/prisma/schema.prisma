@@ -32,6 +32,7 @@ model Event {
   location    String?
   eventDate   DateTime?
   status      EventStatus @default(DRAFT)
+  fieldConfig Json?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   createdById String?
@@ -62,12 +63,16 @@ model Registration {
   id             String             @id @default(cuid())
   eventId        String
   distanceId     String
-  fullName       String
-  phone          String
-  email          String
-  dob            DateTime
-  emergencyName  String
-  emergencyPhone String
+  fullName       String?
+  phone          String?
+  email          String?
+  dob            DateTime?
+  idNumber       String?
+  shirtSize      String?
+  bloodType      String?
+  medicalConditions String?
+  emergencyName  String?
+  emergencyPhone String?
   bibNumber           Int?
   disclaimerSignature String?
   disclaimerSignedAt  DateTime?

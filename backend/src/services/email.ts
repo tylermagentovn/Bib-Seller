@@ -12,13 +12,21 @@ const transporter = nodemailer.createTransport({
 
 interface ConfirmationEmailData {
   to: string;
-  fullName: string;
+  fullName: string | null;
   eventName: string;
   distanceName: string;
   bibNumber: number;
   registrationId: string;
   eventDate?: string | null;
   location?: string | null;
+  phone?: string | null;
+  dob?: string | null;
+  idNumber?: string | null;
+  shirtSize?: string | null;
+  bloodType?: string | null;
+  medicalConditions?: string | null;
+  emergencyName?: string | null;
+  emergencyPhone?: string | null;
 }
 
 export async function sendConfirmationEmail(data: ConfirmationEmailData) {
@@ -51,7 +59,7 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData) {
           <p>Chào mừng bạn đến với ${data.eventName}</p>
         </div>
         <div class="body">
-          <p>Xin chào <strong>${data.fullName}</strong>,</p>
+          <p>Xin chào <strong>${data.fullName ?? "Bạn"}</strong>,</p>
           <p>Đăng ký của bạn đã được xác nhận. Đây là thông tin BIB của bạn:</p>
           <div class="bib-box">
             <div class="label">Số BIB của bạn</div>
@@ -63,6 +71,14 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData) {
             ${data.eventDate ? `<tr><td>Ngày tổ chức</td><td>${data.eventDate}</td></tr>` : ""}
             ${data.location ? `<tr><td>Địa điểm</td><td>${data.location}</td></tr>` : ""}
             <tr><td>Mã đăng ký</td><td>#${data.registrationId.slice(-8).toUpperCase()}</td></tr>
+            ${data.fullName ? `<tr><td>Họ tên</td><td>${data.fullName}</td></tr>` : ""}
+            ${data.dob ? `<tr><td>Ngày sinh</td><td>${data.dob}</td></tr>` : ""}
+            ${data.phone ? `<tr><td>Điện thoại</td><td>${data.phone}</td></tr>` : ""}
+            ${data.idNumber ? `<tr><td>Số CCCD</td><td>${data.idNumber}</td></tr>` : ""}
+            ${data.shirtSize ? `<tr><td>Size áo</td><td>${data.shirtSize}</td></tr>` : ""}
+            ${data.bloodType ? `<tr><td>Nhóm máu</td><td>${data.bloodType}</td></tr>` : ""}
+            ${data.medicalConditions ? `<tr><td>Bệnh lý</td><td>${data.medicalConditions}</td></tr>` : ""}
+            ${(data.emergencyName || data.emergencyPhone) ? `<tr><td>Liên hệ khẩn cấp</td><td>${[data.emergencyName, data.emergencyPhone].filter(Boolean).join(" — ")}</td></tr>` : ""}
           </table>
           <p style="color:#666; font-size:14px;">Vui lòng mang theo email này hoặc số BIB vào ngày thi đấu. Chúc bạn thi đấu thật tốt!</p>
         </div>

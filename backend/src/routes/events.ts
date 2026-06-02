@@ -60,6 +60,8 @@ const distanceSchema = z.object({
   teamSize: z.number().int().min(2).optional().nullable(),
 });
 
+const fieldVisibilitySchema = z.enum(["required", "optional", "hidden"]);
+
 const eventSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
@@ -73,6 +75,7 @@ const eventSchema = z.object({
   location: z.string().optional(),
   eventDate: z.string().optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "CLOSED"]).default("DRAFT"),
+  fieldConfig: z.record(z.string(), fieldVisibilitySchema).optional().nullable(),
   distances: z.array(distanceSchema).min(1),
 });
 

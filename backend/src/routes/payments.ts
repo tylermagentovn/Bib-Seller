@@ -259,16 +259,26 @@ router.post("/bib/confirm/:registrationId", async (req: Request, res: Response) 
     });
   });
 
-  sendConfirmationEmail({
-    to: registration.email,
-    fullName: registration.fullName,
-    eventName: updated.event.name,
-    distanceName: updated.distance.name,
-    bibNumber,
-    registrationId: registration.id,
-    eventDate: updated.event.eventDate?.toLocaleDateString("vi-VN") ?? null,
-    location: updated.event.location ?? null,
-  }).catch(console.error);
+  if (registration.email) {
+    sendConfirmationEmail({
+      to: registration.email,
+      fullName: registration.fullName ?? null,
+      eventName: updated.event.name,
+      distanceName: updated.distance.name,
+      bibNumber,
+      registrationId: registration.id,
+      eventDate: updated.event.eventDate?.toLocaleDateString("vi-VN") ?? null,
+      location: updated.event.location ?? null,
+      phone: registration.phone ?? null,
+      dob: registration.dob?.toLocaleDateString("vi-VN") ?? null,
+      idNumber: registration.idNumber ?? null,
+      shirtSize: registration.shirtSize ?? null,
+      bloodType: registration.bloodType ?? null,
+      medicalConditions: registration.medicalConditions ?? null,
+      emergencyName: registration.emergencyName ?? null,
+      emergencyPhone: registration.emergencyPhone ?? null,
+    }).catch(console.error);
+  }
 
   updateBibInSheet(registration.id, bibNumber).catch(console.error);
 

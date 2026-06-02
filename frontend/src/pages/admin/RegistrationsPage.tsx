@@ -10,7 +10,11 @@ import {
   Loader2, Pencil, ChevronLeft, ChevronRight, Search,
   X, User, Phone, Mail, Calendar, Shield, CreditCard,
   PenLine, Users, CheckCircle, Clock, Download, Trash2, RefreshCw,
+  BadgeCheck, Shirt, Droplets, HeartPulse,
 } from "lucide-react";
+
+const SHIRT_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
+const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Không biết"];
 
 const PAGE_SIZE = 20;
 
@@ -76,12 +80,16 @@ function EditInfoModal({ reg, onClose }: {
 }) {
   const queryClient = useQueryClient();
 
-  const [fullName, setFullName] = useState(reg.fullName);
-  const [phone, setPhone] = useState(reg.phone);
-  const [email, setEmail] = useState(reg.email);
-  const [dob, setDob] = useState(reg.dob.slice(0, 10));
-  const [emergencyName, setEmergencyName] = useState(reg.emergencyName);
-  const [emergencyPhone, setEmergencyPhone] = useState(reg.emergencyPhone);
+  const [fullName, setFullName] = useState(reg.fullName ?? "");
+  const [phone, setPhone] = useState(reg.phone ?? "");
+  const [email, setEmail] = useState(reg.email ?? "");
+  const [dob, setDob] = useState(reg.dob ? reg.dob.slice(0, 10) : "");
+  const [idNumber, setIdNumber] = useState(reg.idNumber ?? "");
+  const [shirtSize, setShirtSize] = useState(reg.shirtSize ?? "_none_");
+  const [bloodType, setBloodType] = useState(reg.bloodType ?? "_none_");
+  const [medicalConditions, setMedicalConditions] = useState(reg.medicalConditions ?? "");
+  const [emergencyName, setEmergencyName] = useState(reg.emergencyName ?? "");
+  const [emergencyPhone, setEmergencyPhone] = useState(reg.emergencyPhone ?? "");
   const [teamMembers, setTeamMembers] = useState(
     reg.teamMembers.map((m) => ({
       fullName: m.fullName,
@@ -101,7 +109,14 @@ function EditInfoModal({ reg, onClose }: {
   });
 
   const handleSubmit = () => {
-    const payload: Record<string, unknown> = { fullName, phone, email, dob, emergencyName, emergencyPhone };
+    const payload: Record<string, unknown> = {
+      fullName, phone, email, dob,
+      idNumber: idNumber || null,
+      shirtSize: shirtSize === "_none_" ? null : shirtSize || null,
+      bloodType: bloodType === "_none_" ? null : bloodType || null,
+      medicalConditions: medicalConditions || null,
+      emergencyName, emergencyPhone,
+    };
     if (reg.distance.type === "RELAY") payload.teamMembers = teamMembers;
     mutation.mutate(payload);
   };
@@ -143,6 +158,45 @@ function EditInfoModal({ reg, onClose }: {
             <div className="col-span-2">
               <label className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Thông tin bổ sung</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Số CCCD</label>
+                <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Nhập số CCCD" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Size áo</label>
+                <Select value={shirtSize} onValueChange={setShirtSize}>
+                  <SelectTrigger><SelectValue placeholder="Chọn size" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none_">—</SelectItem>
+                    {SHIRT_SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Nhóm máu</label>
+                <Select value={bloodType} onValueChange={setBloodType}>
+                  <SelectTrigger><SelectValue placeholder="Chọn nhóm máu" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none_">—</SelectItem>
+                    {BLOOD_TYPES.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Bệnh lý</label>
+                <textarea
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm min-h-[72px] focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  value={medicalConditions}
+                  onChange={(e) => setMedicalConditions(e.target.value)}
+                  placeholder="Ghi chú bệnh lý..."
+                />
+              </div>
             </div>
           </div>
 
@@ -285,48 +339,98 @@ function DetailModal({ reg, onClose, onEditBib, onEditStatus, onEditInfo }: {
           <section>
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Thông tin cá nhân</h3>
             <div className="bg-gray-50 rounded-xl p-4 space-y-3 text-sm">
-              <div className="flex items-center gap-2.5">
-                <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <div className="flex justify-between w-full">
-                  <span className="text-gray-500">Họ tên</span>
-                  <span className="font-medium">{reg.fullName}</span>
+              {reg.fullName != null && (
+                <div className="flex items-center gap-2.5">
+                  <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex justify-between w-full">
+                    <span className="text-gray-500">Họ tên</span>
+                    <span className="font-medium">{reg.fullName}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <div className="flex justify-between w-full">
-                  <span className="text-gray-500">Ngày sinh</span>
-                  <span className="font-medium">{formatDate(reg.dob)}</span>
+              )}
+              {reg.dob != null && (
+                <div className="flex items-center gap-2.5">
+                  <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex justify-between w-full">
+                    <span className="text-gray-500">Ngày sinh</span>
+                    <span className="font-medium">{formatDate(reg.dob)}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <div className="flex justify-between w-full">
-                  <span className="text-gray-500">Điện thoại</span>
-                  <span className="font-medium">{reg.phone}</span>
+              )}
+              {reg.phone != null && (
+                <div className="flex items-center gap-2.5">
+                  <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex justify-between w-full">
+                    <span className="text-gray-500">Điện thoại</span>
+                    <span className="font-medium">{reg.phone}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <div className="flex justify-between w-full">
-                  <span className="text-gray-500">Email</span>
-                  <span className="font-medium text-right break-all max-w-[60%]">{reg.email}</span>
+              )}
+              {reg.email != null && (
+                <div className="flex items-center gap-2.5">
+                  <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex justify-between w-full">
+                    <span className="text-gray-500">Email</span>
+                    <span className="font-medium text-right break-all max-w-[60%]">{reg.email}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="border-t pt-3 mt-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield className="h-4 w-4 text-gray-400" />
-                  <span className="text-xs text-gray-500 font-medium">Liên hệ khẩn cấp</span>
+              )}
+              {reg.idNumber != null && (
+                <div className="flex items-center gap-2.5">
+                  <BadgeCheck className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex justify-between w-full">
+                    <span className="text-gray-500">Số CCCD</span>
+                    <span className="font-medium">{reg.idNumber}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-gray-500">Họ tên</span>
-                  <span className="font-medium">{reg.emergencyName}</span>
+              )}
+              {reg.shirtSize != null && (
+                <div className="flex items-center gap-2.5">
+                  <Shirt className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex justify-between w-full">
+                    <span className="text-gray-500">Size áo</span>
+                    <span className="font-medium">{reg.shirtSize}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Điện thoại</span>
-                  <span className="font-medium">{reg.emergencyPhone}</span>
+              )}
+              {reg.bloodType != null && (
+                <div className="flex items-center gap-2.5">
+                  <Droplets className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex justify-between w-full">
+                    <span className="text-gray-500">Nhóm máu</span>
+                    <span className="font-medium">{reg.bloodType}</span>
+                  </div>
                 </div>
-              </div>
+              )}
+              {reg.medicalConditions != null && (
+                <div className="flex items-start gap-2.5">
+                  <HeartPulse className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex flex-col w-full gap-1">
+                    <span className="text-gray-500">Bệnh lý</span>
+                    <span className="font-medium text-gray-700 bg-white border rounded-lg p-2 text-xs whitespace-pre-wrap">{reg.medicalConditions}</span>
+                  </div>
+                </div>
+              )}
+              {(reg.emergencyName != null || reg.emergencyPhone != null) && (
+                <div className="border-t pt-3 mt-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield className="h-4 w-4 text-gray-400" />
+                    <span className="text-xs text-gray-500 font-medium">Liên hệ khẩn cấp</span>
+                  </div>
+                  {reg.emergencyName != null && (
+                    <div className="flex justify-between mb-1">
+                      <span className="text-gray-500">Họ tên</span>
+                      <span className="font-medium">{reg.emergencyName}</span>
+                    </div>
+                  )}
+                  {reg.emergencyPhone != null && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Điện thoại</span>
+                      <span className="font-medium">{reg.emergencyPhone}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </section>
 

@@ -24,6 +24,21 @@ api.interceptors.response.use(
 );
 
 // Types
+export type FieldVisibility = "required" | "optional" | "hidden";
+
+export interface FieldConfig {
+  fullName?: FieldVisibility;
+  dob?: FieldVisibility;
+  phone?: FieldVisibility;
+  email?: FieldVisibility;
+  idNumber?: FieldVisibility;
+  shirtSize?: FieldVisibility;
+  bloodType?: FieldVisibility;
+  medicalConditions?: FieldVisibility;
+  emergencyName?: FieldVisibility;
+  emergencyPhone?: FieldVisibility;
+}
+
 export interface TeamMember {
   id: string;
   registrationId: string;
@@ -62,6 +77,7 @@ export interface Event {
   location: string | null;
   eventDate: string | null;
   status: "DRAFT" | "PUBLISHED" | "CLOSED";
+  fieldConfig: FieldConfig | null;
   distances: Distance[];
   createdAt: string;
 }
@@ -74,8 +90,12 @@ export interface Registration {
   phone: string;
   email: string;
   dob: string;
-  emergencyName: string;
-  emergencyPhone: string;
+  emergencyName: string | null;
+  emergencyPhone: string | null;
+  idNumber: string | null;
+  shirtSize: string | null;
+  bloodType: string | null;
+  medicalConditions: string | null;
   bibNumber: number | null;
   disclaimerSignature: string | null;
   disclaimerSignedAt: string | null;

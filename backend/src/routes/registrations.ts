@@ -17,12 +17,16 @@ const teamMemberSchema = z.object({
 const registrationSchema = z.object({
   eventId: z.string().min(1),
   distanceId: z.string().min(1),
-  fullName: z.string().min(1),
-  phone: z.string().min(9),
-  email: z.string().email(),
-  dob: z.string(),
-  emergencyName: z.string().min(1),
-  emergencyPhone: z.string().min(9),
+  fullName: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  dob: z.string().optional(),
+  idNumber: z.string().optional(),
+  shirtSize: z.string().optional(),
+  bloodType: z.string().optional(),
+  medicalConditions: z.string().optional(),
+  emergencyName: z.string().optional(),
+  emergencyPhone: z.string().optional(),
   teamMembers: z.array(teamMemberSchema).optional(),
 });
 
@@ -80,8 +84,18 @@ router.post("/", async (req: Request, res: Response) => {
 
   const registration = await prisma.registration.create({
     data: {
-      ...registrationData,
-      dob: new Date(registrationData.dob),
+      eventId: registrationData.eventId,
+      distanceId: registrationData.distanceId,
+      fullName: registrationData.fullName ?? null,
+      phone: registrationData.phone ?? null,
+      email: registrationData.email || null,
+      dob: registrationData.dob ? new Date(registrationData.dob) : null,
+      idNumber: registrationData.idNumber ?? null,
+      shirtSize: registrationData.shirtSize ?? null,
+      bloodType: registrationData.bloodType ?? null,
+      medicalConditions: registrationData.medicalConditions ?? null,
+      emergencyName: registrationData.emergencyName ?? null,
+      emergencyPhone: registrationData.emergencyPhone ?? null,
       payment: {
         create: {
           amount: distance.price,
@@ -113,16 +127,16 @@ router.post("/", async (req: Request, res: Response) => {
   // Sync to Google Sheet (fire-and-forget)
   appendRegistrationToSheet({
     registrationId: registration.id,
-    fullName: registration.fullName,
-    phone: registration.phone,
-    email: registration.email,
-    dob: registration.dob.toISOString().split("T")[0],
+    fullName: registration.fullName ?? "",
+    phone: registration.phone ?? "",
+    email: registration.email ?? "",
+    dob: registration.dob ? registration.dob.toISOString().split("T")[0] : "",
     eventName: registration.event.name,
     distanceName: registration.distance.name,
     bibNumber: null,
     status: registration.status,
-    emergencyName: registration.emergencyName,
-    emergencyPhone: registration.emergencyPhone,
+    emergencyName: registration.emergencyName ?? "",
+    emergencyPhone: registration.emergencyPhone ?? "",
     createdAt: registration.createdAt.toISOString(),
   });
 
@@ -184,16 +198,16 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
 
     return [
       r.id,
-      r.fullName,
-      r.dob.toISOString().split("T")[0],
-      r.phone,
-      r.email,
+      r.fullName ?? "",
+      r.dob ? r.dob.toISOString().split("T")[0] : "",
+      r.phone ?? "",
+      r.email ?? "",
       r.event.name,
       r.distance.name,
       r.distance.type === "RELAY" ? "Tiep suc" : "Ca nhan",
       r.bibNumber ?? "",
-      r.emergencyName,
-      r.emergencyPhone,
+      r.emergencyName ?? "",
+      r.emergencyPhone ?? "",
       r.status === "PAID" ? "Da thanh toan" : r.status === "CANCELLED" ? "Da huy" : "Cho thanh toan",
       r.payment?.amount ?? "",
       r.payment?.paidAt ? r.payment.paidAt.toISOString().replace("T", " ").slice(0, 19) : "",
@@ -273,12 +287,16 @@ router.post("/:id/sign-disclaimer", async (req: Request, res: Response) => {
 // Admin: update registration info
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const updateSchema = z.object({
-    fullName: z.string().min(1),
-    phone: z.string().min(9),
-    email: z.string().email(),
-    dob: z.string(),
-    emergencyName: z.string().min(1),
-    emergencyPhone: z.string().min(9),
+    fullName: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().email().optional().or(z.literal("")),
+    dob: z.string().optional(),
+    idNumber: z.string().nullable().optional(),
+    shirtSize: z.string().nullable().optional(),
+    bloodType: z.string().nullable().optional(),
+    medicalConditions: z.string().nullable().optional(),
+    emergencyName: z.string().optional(),
+    emergencyPhone: z.string().optional(),
     teamMembers: z
       .array(
         z.object({
@@ -318,7 +336,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const updated = await prisma.$transaction(async (tx) => {
     await tx.registration.update({
       where: { id },
-      data: { ...data, dob: new Date(data.dob) },
+      data: { ...data, dob: data.dob ? new Date(data.dob) : undefined },
     });
 
     if (registration.distance.type === "RELAY" && teamMembers) {

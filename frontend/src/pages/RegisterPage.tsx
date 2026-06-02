@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { api, type Event } from "@/lib/api";
+import { api, type Event, type FieldConfig, type FieldVisibility } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,35 +13,105 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Loader2, Users } from "lucide-react";
 
-const teamMemberSchema = z.object({
-  fullName: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự"),
-  phone: z.string().min(9, "Số điện thoại không hợp lệ"),
-  email: z.string().email("Email không hợp lệ").optional().or(z.literal("")),
-  dob: z.string().min(1, "Vui lòng nhập ngày sinh"),
-});
+const SHIRT_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
+const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Không biết"];
 
-const schema = z.object({
-  fullName: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự"),
-  phone: z.string().min(9, "Số điện thoại không hợp lệ"),
-  email: z.string().email("Email không hợp lệ"),
-  dob: z.string().min(1, "Vui lòng nhập ngày sinh"),
-  distanceId: z.string().min(1, "Vui lòng chọn cự ly"),
-  emergencyName: z.string().min(2, "Vui lòng nhập tên người liên hệ"),
-  emergencyPhone: z.string().min(9, "Số điện thoại không hợp lệ"),
-  disclaimer: z.boolean().refine((v) => v, "Bạn phải đồng ý với điều khoản"),
-  teamMembers: z.array(teamMemberSchema).optional(),
-});
+const DEFAULT_FIELD_CONFIG: Required<FieldConfig> = {
+  fullName: "required",
+  dob: "required",
+  phone: "required",
+  email: "required",
+  idNumber: "hidden",
+  shirtSize: "hidden",
+  bloodType: "hidden",
+  medicalConditions: "hidden",
+  emergencyName: "required",
+  emergencyPhone: "required",
+};
 
-type FormData = z.infer<typeof schema>;
+function vis(cfg: FieldConfig, key: keyof FieldConfig): FieldVisibility {
+  return cfg[key] ?? DEFAULT_FIELD_CONFIG[key];
+}
+
+function buildSchema(cfg: FieldConfig) {
+  const req = (key: keyof FieldConfig) => vis(cfg, key) === "required";
+  const show = (key: keyof FieldConfig) => vis(cfg, key) !== "hidden";
+
+  return z.object({
+    distanceId: z.string().min(1, "Vui lòng chọn cự ly"),
+    fullName: show("fullName")
+      ? req("fullName") ? z.string().min(2, "Họ tên phải có ít nhất 2 ký tự") : z.string().optional()
+      : z.string().optional(),
+    phone: show("phone")
+      ? req("phone") ? z.string().min(9, "Số điện thoại không hợp lệ") : z.string().optional()
+      : z.string().optional(),
+    email: show("email")
+      ? req("email") ? z.string().email("Email không hợp lệ") : z.string().email("Email không hợp lệ").optional().or(z.literal(""))
+      : z.string().optional(),
+    dob: show("dob")
+      ? req("dob") ? z.string().min(1, "Vui lòng nhập ngày sinh") : z.string().optional()
+      : z.string().optional(),
+    idNumber: show("idNumber")
+      ? req("idNumber") ? z.string().min(1, "Vui lòng nhập số CCCD") : z.string().optional()
+      : z.string().optional(),
+    shirtSize: show("shirtSize")
+      ? req("shirtSize") ? z.string().min(1, "Vui lòng chọn size áo") : z.string().optional()
+      : z.string().optional(),
+    bloodType: show("bloodType")
+      ? req("bloodType") ? z.string().min(1, "Vui lòng chọn nhóm máu") : z.string().optional()
+      : z.string().optional(),
+    medicalConditions: show("medicalConditions")
+      ? req("medicalConditions") ? z.string().min(1, "Vui lòng nhập thông tin bệnh lý") : z.string().optional()
+      : z.string().optional(),
+    emergencyName: show("emergencyName")
+      ? req("emergencyName") ? z.string().min(2, "Vui lòng nhập tên người liên hệ") : z.string().optional()
+      : z.string().optional(),
+    emergencyPhone: show("emergencyPhone")
+      ? req("emergencyPhone") ? z.string().min(9, "Số điện thoại không hợp lệ") : z.string().optional()
+      : z.string().optional(),
+    disclaimer: z.boolean().refine((v) => v, "Bạn phải đồng ý với điều khoản"),
+    teamMembers: z
+      .array(
+        z.object({
+          fullName: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự"),
+          phone: z.string().min(9, "Số điện thoại không hợp lệ"),
+          email: z.string().email("Email không hợp lệ").optional().or(z.literal("")),
+          dob: z.string().min(1, "Vui lòng nhập ngày sinh"),
+        })
+      )
+      .optional(),
+  });
+}
+
+type FormData = ReturnType<typeof buildSchema> extends z.ZodType<infer T> ? T : never;
 
 export function RegisterPage() {
   const { slug } = useParams<{ slug: string }>();
-  const navigate = useNavigate();
-
   const { data: event, isLoading } = useQuery<Event>({
     queryKey: ["event", slug],
     queryFn: () => api.get(`/events/${slug}`).then((r) => r.data),
   });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  if (!event) return null;
+
+  return <RegisterForm event={event} />;
+}
+
+function RegisterForm({ event }: { event: Event }) {
+  const navigate = useNavigate();
+  const cfg = (event.fieldConfig as FieldConfig) ?? {};
+  const show = (key: keyof FieldConfig) => vis(cfg, key) !== "hidden";
+  const isReq = (key: keyof FieldConfig) => vis(cfg, key) === "required";
+
+  const schema = buildSchema(cfg);
 
   const {
     register,
@@ -58,7 +128,7 @@ export function RegisterPage() {
   });
 
   const selectedDistanceId = watch("distanceId") ?? "";
-  const selectedDistance = event?.distances.find((d) => d.id === selectedDistanceId);
+  const selectedDistance = event.distances.find((d) => d.id === selectedDistanceId);
   const isRelay = selectedDistance?.type === "RELAY";
   const teamSize = selectedDistance?.teamSize ?? 2;
 
@@ -76,7 +146,7 @@ export function RegisterPage() {
 
   const mutation = useMutation({
     mutationFn: (data: Omit<FormData, "disclaimer">) =>
-      api.post("/registrations", { ...data, eventId: event!.id }).then((r) => r.data),
+      api.post("/registrations", { ...data, eventId: event.id }).then((r) => r.data),
     onSuccess: (reg) => {
       navigate(`/payment/${reg.id}`);
     },
@@ -87,21 +157,18 @@ export function RegisterPage() {
     mutation.mutate(rest);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
-
-  if (!event) return null;
+  const fieldLabel = (key: keyof FieldConfig, defaultLabel: string) => (
+    <>
+      {defaultLabel}
+      {isReq(key) && <span className="text-red-500"> *</span>}
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-xl mx-auto">
         <Button asChild variant="ghost" size="sm" className="mb-6 -ml-2">
-          <Link to={`/events/${slug}`}>
+          <Link to={`/events/${event.slug}`}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Quay lại
           </Link>
         </Button>
@@ -139,32 +206,98 @@ export function RegisterPage() {
             </div>
 
             {/* Full name */}
-            <div className="space-y-1.5">
-              <Label>{isRelay ? "Họ và tên đội trưởng" : "Họ và tên"} <span className="text-red-500">*</span></Label>
-              <Input placeholder="Nguyễn Văn A" {...register("fullName")} />
-              {errors.fullName && <p className="text-xs text-red-500">{errors.fullName.message}</p>}
-            </div>
+            {show("fullName") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("fullName", isRelay ? "Họ và tên đội trưởng" : "Họ và tên")}</Label>
+                <Input placeholder="Nguyễn Văn A" {...register("fullName")} />
+                {errors.fullName && <p className="text-xs text-red-500">{errors.fullName.message}</p>}
+              </div>
+            )}
 
             {/* Phone */}
-            <div className="space-y-1.5">
-              <Label>Số điện thoại <span className="text-red-500">*</span></Label>
-              <Input placeholder="0901234567" type="tel" {...register("phone")} />
-              {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
-            </div>
+            {show("phone") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("phone", "Số điện thoại")}</Label>
+                <Input placeholder="0901234567" type="tel" {...register("phone")} />
+                {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
+              </div>
+            )}
 
             {/* Email */}
-            <div className="space-y-1.5">
-              <Label>Email <span className="text-red-500">*</span></Label>
-              <Input placeholder="email@example.com" type="email" {...register("email")} />
-              {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
-            </div>
+            {show("email") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("email", "Email")}</Label>
+                <Input placeholder="email@example.com" type="email" {...register("email")} />
+                {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+              </div>
+            )}
 
             {/* DOB */}
-            <div className="space-y-1.5">
-              <Label>Ngày sinh <span className="text-red-500">*</span></Label>
-              <Input type="date" {...register("dob")} />
-              {errors.dob && <p className="text-xs text-red-500">{errors.dob.message}</p>}
-            </div>
+            {show("dob") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("dob", "Ngày sinh")}</Label>
+                <Input type="date" {...register("dob")} />
+                {errors.dob && <p className="text-xs text-red-500">{errors.dob.message}</p>}
+              </div>
+            )}
+
+            {/* ID Number */}
+            {show("idNumber") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("idNumber", "Số CCCD")}</Label>
+                <Input placeholder="012345678901" {...register("idNumber")} />
+                {errors.idNumber && <p className="text-xs text-red-500">{errors.idNumber.message}</p>}
+              </div>
+            )}
+
+            {/* Shirt Size */}
+            {show("shirtSize") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("shirtSize", "Size áo")}</Label>
+                <Select value={watch("shirtSize") ?? ""} onValueChange={(v) => setValue("shirtSize", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn size áo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SHIRT_SIZES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.shirtSize && <p className="text-xs text-red-500">{errors.shirtSize.message}</p>}
+              </div>
+            )}
+
+            {/* Blood Type */}
+            {show("bloodType") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("bloodType", "Nhóm máu")}</Label>
+                <Select value={watch("bloodType") ?? ""} onValueChange={(v) => setValue("bloodType", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn nhóm máu" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BLOOD_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.bloodType && <p className="text-xs text-red-500">{errors.bloodType.message}</p>}
+              </div>
+            )}
+
+            {/* Medical Conditions */}
+            {show("medicalConditions") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("medicalConditions", "Bệnh lý")}</Label>
+                <textarea
+                  className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[70px] resize-none"
+                  placeholder="Các bệnh lý hoặc tình trạng sức khỏe cần lưu ý (nếu có)"
+                  {...register("medicalConditions")}
+                />
+                {errors.medicalConditions && <p className="text-xs text-red-500">{errors.medicalConditions.message}</p>}
+              </div>
+            )}
 
             {/* Team members (RELAY only) */}
             {isRelay && memberFields.length > 0 && (
@@ -215,21 +348,28 @@ export function RegisterPage() {
               </div>
             )}
 
-            <div className="border-t pt-5">
-              <p className="text-sm font-medium text-gray-700 mb-4">Người liên hệ khẩn cấp</p>
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label>Họ tên <span className="text-red-500">*</span></Label>
-                  <Input placeholder="Nguyễn Thị B" {...register("emergencyName")} />
-                  {errors.emergencyName && <p className="text-xs text-red-500">{errors.emergencyName.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Số điện thoại <span className="text-red-500">*</span></Label>
-                  <Input placeholder="0901234567" type="tel" {...register("emergencyPhone")} />
-                  {errors.emergencyPhone && <p className="text-xs text-red-500">{errors.emergencyPhone.message}</p>}
+            {/* Emergency contact */}
+            {(show("emergencyName") || show("emergencyPhone")) && (
+              <div className="border-t pt-5">
+                <p className="text-sm font-medium text-gray-700 mb-4">Người liên hệ khẩn cấp</p>
+                <div className="space-y-4">
+                  {show("emergencyName") && (
+                    <div className="space-y-1.5">
+                      <Label>{fieldLabel("emergencyName", "Họ tên")}</Label>
+                      <Input placeholder="Nguyễn Thị B" {...register("emergencyName")} />
+                      {errors.emergencyName && <p className="text-xs text-red-500">{errors.emergencyName.message}</p>}
+                    </div>
+                  )}
+                  {show("emergencyPhone") && (
+                    <div className="space-y-1.5">
+                      <Label>{fieldLabel("emergencyPhone", "Số điện thoại")}</Label>
+                      <Input placeholder="0901234567" type="tel" {...register("emergencyPhone")} />
+                      {errors.emergencyPhone && <p className="text-xs text-red-500">{errors.emergencyPhone.message}</p>}
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Disclaimer */}
             <div className="bg-gray-50 rounded-xl p-4 border">

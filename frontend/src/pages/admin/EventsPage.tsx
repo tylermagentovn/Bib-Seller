@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { api, type Event } from "@/lib/api";
+import { api, type Event, type FieldConfig, type FieldVisibility } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,32 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, X, Loader2, Calendar, MapPin, Upload } from "lucide-react";
+
+const FIELD_CONFIG_ITEMS: { key: keyof FieldConfig; label: string }[] = [
+  { key: "fullName", label: "Họ và tên" },
+  { key: "dob", label: "Ngày sinh" },
+  { key: "phone", label: "Số điện thoại" },
+  { key: "email", label: "Email" },
+  { key: "idNumber", label: "Số CCCD" },
+  { key: "shirtSize", label: "Size áo" },
+  { key: "bloodType", label: "Nhóm máu" },
+  { key: "medicalConditions", label: "Bệnh lý" },
+  { key: "emergencyName", label: "Tên liên hệ khẩn cấp" },
+  { key: "emergencyPhone", label: "SDT liên hệ khẩn cấp" },
+];
+
+const DEFAULT_FIELD_CONFIG: FieldConfig = {
+  fullName: "required",
+  dob: "required",
+  phone: "required",
+  email: "required",
+  idNumber: "hidden",
+  shirtSize: "hidden",
+  bloodType: "hidden",
+  medicalConditions: "hidden",
+  emergencyName: "required",
+  emergencyPhone: "required",
+};
 
 const distanceSchema = z.object({
   id: z.string().optional(),
@@ -65,6 +91,7 @@ export function AdminEventsPage() {
   const raceKitInputRef = useRef<HTMLInputElement>(null);
   const [shirtSizeUrl, setShirtSizeUrl] = useState("");
   const [raceKitUrl, setRaceKitUrl] = useState("");
+  const [fieldConfig, setFieldConfig] = useState<FieldConfig>({ ...DEFAULT_FIELD_CONFIG });
 
   const openCreate = () => {
     reset({ status: "DRAFT", raceKitDescription: "", distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
@@ -72,6 +99,7 @@ export function AdminEventsPage() {
     setRaceKitUrl("");
     setShirtUploadedUrls([]);
     setRaceKitUploadedUrls([]);
+    setFieldConfig({ ...DEFAULT_FIELD_CONFIG });
     setEditing(null);
     setShowForm(true);
   };
@@ -105,6 +133,7 @@ export function AdminEventsPage() {
     setRaceKitUrl((event as any).raceKitImageUrl ?? "");
     setShirtUploadedUrls([]);
     setRaceKitUploadedUrls([]);
+    setFieldConfig({ ...DEFAULT_FIELD_CONFIG, ...(event.fieldConfig ?? {}) });
     setEditing(event);
     setShowForm(true);
   };
@@ -151,7 +180,7 @@ export function AdminEventsPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit((d) => saveMutation.mutate({ ...d, shirtSizeImageUrl: shirtSizeUrl, raceKitImageUrl: raceKitUrl }))} className="p-5 space-y-4">
+            <form onSubmit={handleSubmit((d) => { const payload = { ...d, shirtSizeImageUrl: shirtSizeUrl, raceKitImageUrl: raceKitUrl, fieldConfig }; saveMutation.mutate(payload); })} className="p-5 space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Tên sự kiện *</Label>
@@ -349,6 +378,42 @@ export function AdminEventsPage() {
                       <SelectItem value="CLOSED">Đã đóng</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              {/* Field config */}
+              <div className="border-t pt-4 space-y-3">
+                <Label className="text-base">Cấu hình form đăng ký</Label>
+                <p className="text-xs text-gray-400">Chọn trạng thái hiển thị cho từng trường trong form đăng ký người tham gia</p>
+                <div className="space-y-2">
+                  {FIELD_CONFIG_ITEMS.map(({ key, label }) => {
+                    const current = fieldConfig[key] ?? DEFAULT_FIELD_CONFIG[key] ?? "hidden";
+                    return (
+                      <div key={key} className="flex items-center justify-between gap-2">
+                        <span className="text-sm text-gray-700 min-w-0 flex-1 truncate">{label}</span>
+                        <div className="flex rounded-lg border overflow-hidden shrink-0 text-xs font-medium">
+                          {(["required", "optional", "hidden"] as FieldVisibility[]).map((vis) => (
+                            <button
+                              key={vis}
+                              type="button"
+                              onClick={() => setFieldConfig((prev) => ({ ...prev, [key]: vis }))}
+                              className={`px-2.5 py-1 transition-colors ${
+                                current === vis
+                                  ? vis === "required"
+                                    ? "bg-indigo-600 text-white"
+                                    : vis === "optional"
+                                    ? "bg-amber-500 text-white"
+                                    : "bg-gray-400 text-white"
+                                  : "bg-white text-gray-400 hover:bg-gray-50"
+                              }`}
+                            >
+                              {vis === "required" ? "Bắt buộc" : vis === "optional" ? "Tùy chọn" : "Ẩn"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
