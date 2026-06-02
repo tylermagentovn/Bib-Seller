@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, AuthRequest } from "../middleware/auth";
 
 const router = Router();
 
@@ -34,12 +34,15 @@ router.get("/:slug", async (req: Request, res: Response) => {
   res.json(event);
 });
 
-// Admin: list all events
-router.get("/admin/all", requireAuth, async (_req: Request, res: Response) => {
+// Admin: list events (SUPER_ADMIN sees all, EVENT_MANAGER sees only their own)
+router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) => {
+  const where = req.adminRole === "EVENT_MANAGER" ? { createdById: req.adminId } : {};
   const events = await prisma.event.findMany({
+    where,
     include: {
       distances: true,
       _count: { select: { registrations: true } },
+      createdBy: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -70,7 +73,7 @@ const eventSchema = z.object({
   distances: z.array(distanceSchema).min(1),
 });
 
-router.post("/", requireAuth, async (req: Request, res: Response) => {
+router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   const parsed = eventSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -84,6 +87,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
       imageUrl: eventData.imageUrl || null,
       disclaimer: eventData.disclaimer || null,
+      createdById: req.adminId,
       distances: {
         create: distances.map((d) => ({
           name: d.name,
@@ -101,7 +105,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
   res.status(201).json(event);
 });
 
-router.put("/:id", requireAuth, async (req: Request, res: Response) => {
+router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const parsed = eventSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -110,6 +114,15 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 
   const { distances, ...eventData } = parsed.data;
   const eventId = req.params.id as string;
+
+  // EVENT_MANAGER can only edit their own events
+  if (req.adminRole === "EVENT_MANAGER") {
+    const event = await prisma.event.findUnique({ where: { id: eventId }, select: { createdById: true } });
+    if (!event || event.createdById !== req.adminId) {
+      res.status(403).json({ error: "Forbidden: Bạn không có quyền sửa sự kiện này" });
+      return;
+    }
+  }
 
   // Find distances being removed (existing but not in incoming list)
   const existingDistances = await prisma.distance.findMany({
@@ -175,8 +188,19 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
   res.json(event);
 });
 
-router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
-  await prisma.event.delete({ where: { id: req.params.id as string } });
+router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+  const eventId = req.params.id as string;
+
+  // EVENT_MANAGER can only delete their own events
+  if (req.adminRole === "EVENT_MANAGER") {
+    const event = await prisma.event.findUnique({ where: { id: eventId }, select: { createdById: true } });
+    if (!event || event.createdById !== req.adminId) {
+      res.status(403).json({ error: "Forbidden: Bạn không có quyền xóa sự kiện này" });
+      return;
+    }
+  }
+
+  await prisma.event.delete({ where: { id: eventId } });
   res.status(204).send();
 });
 

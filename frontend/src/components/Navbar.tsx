@@ -1,10 +1,14 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Bib1sLogo } from "./Bib1sLogo";
 
 export function Navbar() {
+  const location = useLocation();
+  const isEventPage = location.pathname.startsWith("/events/");
+  const containerClass = isEventPage ? "max-w-4xl" : "max-w-6xl";
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
-      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className={`${containerClass} mx-auto px-4 h-16 flex items-center justify-between`}>
         <Link to="/">
           <Bib1sLogo />
         </Link>

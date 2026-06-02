@@ -1,17 +1,11 @@
 import { Navigate, Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { LayoutDashboard, Calendar, Users, LogOut, Loader2 } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, LogOut, Loader2, ShieldCheck, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Bib1sLogo } from "./Bib1sLogo";
 
-const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
-  { icon: Calendar, label: "Sự kiện", path: "/admin/events" },
-  { icon: Users, label: "Đăng ký", path: "/admin/registrations" },
-];
-
 export function AdminLayout() {
-  const { admin, logout, isLoading } = useAuth();
+  const { admin, logout, isLoading, isSuperAdmin } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -23,6 +17,13 @@ export function AdminLayout() {
   }
 
   if (!admin) return <Navigate to="/admin/login" replace />;
+
+  const navItems = [
+    { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
+    { icon: Calendar, label: "Sự kiện", path: "/admin/events" },
+    { icon: Users, label: "Đăng ký", path: "/admin/registrations" },
+    ...(isSuperAdmin ? [{ icon: UserCog, label: "Tài khoản", path: "/admin/accounts" }] : []),
+  ];
 
   return (
     <div className="min-h-screen flex bg-gray-50">
@@ -53,7 +54,13 @@ export function AdminLayout() {
         </nav>
 
         <div className="p-4 border-t">
-          <div className="text-xs text-gray-500 mb-2 truncate">{admin.name}</div>
+          <div className="text-xs text-gray-500 mb-1 truncate">{admin.name}</div>
+          <div className="flex items-center gap-1 mb-3">
+            <ShieldCheck className="h-3 w-3 text-indigo-400" />
+            <span className="text-xs text-indigo-500 font-medium">
+              {isSuperAdmin ? "Super Admin" : "Quản lý sự kiện"}
+            </span>
+          </div>
           <button
             onClick={logout}
             className="flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 transition-colors w-full"

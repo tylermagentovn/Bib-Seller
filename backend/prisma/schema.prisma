@@ -7,12 +7,15 @@ datasource db {
 }
 
 model Admin {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String    @id @default(cuid())
+  email     String    @unique
   password  String
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  role      AdminRole @default(EVENT_MANAGER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  events Event[]
 }
 
 model Event {
@@ -28,7 +31,9 @@ model Event {
   status      EventStatus @default(DRAFT)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  createdById String?
 
+  createdBy     Admin?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
   distances     Distance[]
   registrations Registration[]
 }
@@ -111,6 +116,11 @@ model Payment {
   registration Registration @relation(fields: [registrationId], references: [id])
 
   @@index([payosOrderCode])
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  EVENT_MANAGER
 }
 
 enum DistanceType {

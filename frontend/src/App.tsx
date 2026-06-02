@@ -14,6 +14,7 @@ import { AdminLoginPage } from "@/pages/admin/LoginPage";
 import { AdminDashboardPage } from "@/pages/admin/DashboardPage";
 import { AdminEventsPage } from "@/pages/admin/EventsPage";
 import { AdminRegistrationsPage } from "@/pages/admin/RegistrationsPage";
+import { AdminAccountsPage } from "@/pages/admin/AccountsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +53,7 @@ export default function App() {
               <Route index element={<AdminDashboardPage />} />
               <Route path="events" element={<AdminEventsPage />} />
               <Route path="registrations" element={<AdminRegistrationsPage />} />
+              <Route path="accounts" element={<AdminAccountsPage />} />
             </Route>
             <Route path="/*" element={<PublicLayout />} />
           </Routes>

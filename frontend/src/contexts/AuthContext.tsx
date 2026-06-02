@@ -1,10 +1,13 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { api } from "@/lib/api";
 
+export type AdminRole = "SUPER_ADMIN" | "EVENT_MANAGER";
+
 interface Admin {
   id: string;
   email: string;
   name: string;
+  role: AdminRole;
 }
 
 interface AuthContextValue {
@@ -12,6 +15,7 @@ interface AuthContextValue {
   login: (token: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -40,8 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAdmin(null);
   };
 
+  const isSuperAdmin = admin?.role === "SUPER_ADMIN";
+
   return (
-    <AuthContext.Provider value={{ admin, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ admin, login, logout, isLoading, isSuperAdmin }}>
       {children}
     </AuthContext.Provider>
   );

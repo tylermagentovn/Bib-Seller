@@ -6,7 +6,7 @@ import { api, type Event } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Users, ArrowRight, AlertCircle } from "lucide-react";
+import { Calendar, MapPin, Users, ArrowRight, ChevronRight, AlertCircle } from "lucide-react";
 
 export function EventDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -89,77 +89,35 @@ export function EventDetailPage() {
         <meta name="twitter:description" content={pageDescription} />
         <meta name="twitter:image" content={pageImage} />
       </Helmet>
-      {/* Hero */}
-      <div className="bg-gradient-to-br from-indigo-600 to-violet-700 px-6 py-8 md:py-10">
-        <div className="max-w-4xl mx-auto">
-          <Badge variant="default" className="mb-3 bg-white/20 text-white border-white/30">
-            {event.status === "PUBLISHED" ? "Đang mở đăng ký" : event.status}
-          </Badge>
-          <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">{event.name}</h1>
-        </div>
-      </div>
-
       <div className="max-w-4xl mx-auto px-4 py-8 grid gap-8 md:grid-cols-3">
-        {/* Main content */}
         <div className="md:col-span-2 space-y-6">
-          {/* Info chips */}
-          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-            {event.eventDate && (
-              <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 shadow-sm border">
-                <Calendar className="h-4 w-4 text-indigo-500" />
-                {formatDate(event.eventDate)}
-              </div>
-            )}
-            {event.location && (
-              <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 shadow-sm border">
-                <MapPin className="h-4 w-4 text-indigo-500" />
-                {event.location}
-              </div>
-            )}
-            <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 shadow-sm border">
-              <Users className="h-4 w-4 text-indigo-500" />
-              {event.distances.length} cự ly
+          <div className="bg-white rounded-2xl p-4 shadow-sm border">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+              <Link to="/" className="text-indigo-600 hover:underline">
+                Trang chủ
+              </Link>
+              <ChevronRight className="h-4 w-4" />
+              <Link to="/" className="text-indigo-600 hover:underline">
+                Sự kiện
+              </Link>
+              <ChevronRight className="h-4 w-4" />
+              <span className="font-medium text-gray-700 truncate">{event.name}</span>
             </div>
           </div>
 
-          {/* Description */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border">
-            <h2 className="font-semibold text-gray-900 text-lg mb-3">Giới thiệu sự kiện</h2>
-            <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{event.description}</p>
+            <Badge variant="default" className="mb-3 bg-indigo-100 text-indigo-700 border-indigo-200">
+              {event.status === "PUBLISHED" ? "Đang mở đăng ký" : event.status}
+            </Badge>
+            <h1 className="text-3xl font-bold text-gray-900 leading-tight">{event.name}</h1>
           </div>
 
-          {/* Rules */}
-          {event.rules && (
-            <div className="bg-white rounded-2xl p-6 shadow-sm border">
-              <h2 className="font-semibold text-gray-900 text-lg mb-3">Quy định tham gia</h2>
-              <div className="text-gray-600 leading-relaxed whitespace-pre-wrap break-words text-sm">{linkify(event.rules)}</div>
-            </div>
-          )}
-
-          {/* Distances detail */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border">
-            <h2 className="font-semibold text-gray-900 text-lg mb-4">Các cự ly</h2>
-            <div className="space-y-3">
-              {event.distances.map((d) => (
-                <div key={d.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                  <div>
-                    <span className="font-medium text-gray-900">{d.name}</span>
-                    <span className="text-xs text-gray-400 ml-2">BIB #{d.bibStart}–{d.bibEnd}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-indigo-600">{formatCurrency(d.price)}</div>
-                    <div className="text-xs text-gray-400">{d.maxSlots} suất</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="bg-white overflow-hidden rounded-3xl shadow-sm border">
+            <img src={pageImage} alt={event.name} className="w-full h-72 md:h-96 object-cover" />
           </div>
-        </div>
 
-        {/* Sidebar: register CTA */}
-        <div className="md:col-span-1 order-first md:order-none">
-          <div className="md:sticky md:top-24 bg-white rounded-2xl p-6 shadow-sm border">
-            <h3 className="font-bold text-gray-900 text-lg mb-4">Đăng ký tham gia</h3>
+          <div className="bg-white rounded-2xl p-6 shadow-sm border block md:hidden">
+            <h2 className="font-semibold text-gray-900 text-lg mb-4">Đăng ký tham gia</h2>
             <div className="space-y-2 mb-6">
               {event.distances.map((d) => (
                 <div key={d.id} className="flex justify-between text-sm">
@@ -182,6 +140,88 @@ export function EventDetailPage() {
             <p className="text-xs text-gray-400 text-center mt-3">
               Thanh toán qua QR code. Hoàn tất trong vài phút.
             </p>
+          </div>
+
+          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+            {event.eventDate && (
+              <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 shadow-sm border">
+                <Calendar className="h-4 w-4 text-indigo-500" />
+                {formatDate(event.eventDate)}
+              </div>
+            )}
+            {event.location && (
+              <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 shadow-sm border">
+                <MapPin className="h-4 w-4 text-indigo-500" />
+                {event.location}
+              </div>
+            )}
+            <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 shadow-sm border">
+              <Users className="h-4 w-4 text-indigo-500" />
+              {event.distances.length} cự ly
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border">
+            <h2 className="font-semibold text-gray-900 text-lg mb-3">Giới thiệu sự kiện</h2>
+            <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{event.description}</p>
+          </div>
+
+          {event.rules && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm border">
+              <h2 className="font-semibold text-gray-900 text-lg mb-3">Quy định tham gia</h2>
+              <div className="text-gray-600 leading-relaxed whitespace-pre-wrap break-words text-sm">
+                {linkify(event.rules)}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border">
+            <h2 className="font-semibold text-gray-900 text-lg mb-4">Các cự ly</h2>
+            <div className="space-y-3">
+              {event.distances.map((d) => (
+                <div key={d.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <span className="font-medium text-gray-900">{d.name}</span>
+                    <span className="text-xs text-gray-400 ml-2">BIB #{d.bibStart}–{d.bibEnd}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold text-indigo-600">{formatCurrency(d.price)}</div>
+                    <div className="text-xs text-gray-400">{d.maxSlots} suất</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="md:col-span-1">
+          <div className="md:sticky md:top-24 space-y-4">
+            <div className="hidden md:block bg-white rounded-2xl p-6 shadow-sm border">
+              <h2 className="font-semibold text-gray-900 text-lg mb-3">Đăng ký tham gia</h2>
+              <div className="space-y-2 mb-6">
+                {event.distances.map((d) => (
+                  <div key={d.id} className="flex justify-between text-sm">
+                    <span className="text-gray-600">{d.name}</span>
+                    <span className="font-medium text-gray-900">{formatCurrency(d.price)}</span>
+                  </div>
+                ))}
+              </div>
+              {event.status === "PUBLISHED" ? (
+                <Button asChild size="lg" className="w-full">
+                  <Link to={`/events/${event.slug}/register`}>
+                    Đăng ký ngay <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button disabled size="lg" className="w-full">
+                  Chưa mở đăng ký
+                </Button>
+              )}
+              <p className="text-xs text-gray-400 text-center mt-3">
+                Thanh toán qua QR code. Hoàn tất trong vài phút.
+              </p>
+            </div>
+
           </div>
         </div>
       </div>

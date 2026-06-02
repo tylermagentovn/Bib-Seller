@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, AuthRequest } from "../middleware/auth";
 import { appendRegistrationToSheet } from "../services/sheets";
 import { sendContinueEmail } from "../services/email";
 
@@ -25,6 +25,15 @@ const registrationSchema = z.object({
   emergencyPhone: z.string().min(9),
   teamMembers: z.array(teamMemberSchema).optional(),
 });
+
+// Returns the eventId filter for EVENT_MANAGER (only their own events)
+async function getEventManagerEventIds(adminId: string): Promise<string[]> {
+  const events = await prisma.event.findMany({
+    where: { createdById: adminId },
+    select: { id: true },
+  });
+  return events.map((e) => e.id);
+}
 
 // Public: create registration
 router.post("/", async (req: Request, res: Response) => {
@@ -59,7 +68,7 @@ router.post("/", async (req: Request, res: Response) => {
   if (distance.type === "RELAY") {
     const required = distance.teamSize ?? 2;
     if (!data.teamMembers || data.teamMembers.length !== required) {
-      res.status(400).json({ error: `Cự ly tiếp sức yêu cầu đúng ${required} thành viên` });
+      res.status(400).json({ error: `Cu ly tiep suc yeu cau dung ${required} thanh vien` });
       return;
     }
   }
@@ -134,10 +143,15 @@ router.get("/:id", async (req: Request, res: Response) => {
 });
 
 // Admin: export registrations as CSV
-router.get("/admin/export", requireAuth, async (req: Request, res: Response) => {
+router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response) => {
   const { eventId, status } = req.query;
   const where: Record<string, unknown> = {};
-  if (eventId) where.eventId = eventId;
+  if (eventId) {
+    where.eventId = eventId;
+  } else if (req.adminRole === "EVENT_MANAGER") {
+    const ids = await getEventManagerEventIds(req.adminId!);
+    where.eventId = { in: ids };
+  }
   if (status) where.status = status;
 
   const registrations = await prisma.registration.findMany({
@@ -146,7 +160,7 @@ router.get("/admin/export", requireAuth, async (req: Request, res: Response) => 
     orderBy: { createdAt: "desc" },
   });
 
-  const escape = (val: string | null | undefined) => {
+  const escape = (val: string | number | null | undefined) => {
     if (val == null) return "";
     const s = String(val);
     return s.includes(",") || s.includes('"') || s.includes("\n")
@@ -155,12 +169,12 @@ router.get("/admin/export", requireAuth, async (req: Request, res: Response) => 
   };
 
   const headers = [
-    "ID", "Họ tên", "Ngày sinh", "Điện thoại", "Email",
-    "Sự kiện", "Cự ly", "Loại", "BIB",
-    "Liên hệ khẩn cấp", "SĐT khẩn cấp",
-    "Trạng thái", "Số tiền (VNĐ)", "Thời gian thanh toán", "Mã tham chiếu",
-    "Đã ký miễn trừ", "Thành viên nhóm",
-    "Ngày đăng ký",
+    "ID", "Ho ten", "Ngay sinh", "Dien thoai", "Email",
+    "Su kien", "Cu ly", "Loai", "BIB",
+    "Lien he khan cap", "SDT khan cap",
+    "Trang thai", "So tien (VND)", "Thoi gian thanh toan", "Ma tham chieu",
+    "Da ky mien tru", "Thanh vien nhom",
+    "Ngay dang ky",
   ];
 
   const rows = registrations.map((r) => {
@@ -176,15 +190,15 @@ router.get("/admin/export", requireAuth, async (req: Request, res: Response) => 
       r.email,
       r.event.name,
       r.distance.name,
-      r.distance.type === "RELAY" ? "Tiếp sức" : "Cá nhân",
+      r.distance.type === "RELAY" ? "Tiep suc" : "Ca nhan",
       r.bibNumber ?? "",
       r.emergencyName,
       r.emergencyPhone,
-      r.status === "PAID" ? "Đã thanh toán" : r.status === "CANCELLED" ? "Đã hủy" : "Chờ thanh toán",
+      r.status === "PAID" ? "Da thanh toan" : r.status === "CANCELLED" ? "Da huy" : "Cho thanh toan",
       r.payment?.amount ?? "",
       r.payment?.paidAt ? r.payment.paidAt.toISOString().replace("T", " ").slice(0, 19) : "",
       r.payment?.payosRef ?? "",
-      r.disclaimerSignedAt ? "Có" : "Không",
+      r.disclaimerSignedAt ? "Co" : "Khong",
       members,
       r.createdAt.toISOString().replace("T", " ").slice(0, 19),
     ].map(escape).join(",");
@@ -199,10 +213,15 @@ router.get("/admin/export", requireAuth, async (req: Request, res: Response) => 
 });
 
 // Admin: list all registrations
-router.get("/admin/all", requireAuth, async (req: Request, res: Response) => {
+router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) => {
   const { eventId, status, page = "1", limit = "50" } = req.query;
   const where: Record<string, unknown> = {};
-  if (eventId) where.eventId = eventId;
+  if (eventId) {
+    where.eventId = eventId;
+  } else if (req.adminRole === "EVENT_MANAGER") {
+    const ids = await getEventManagerEventIds(req.adminId!);
+    where.eventId = { in: ids };
+  }
   if (status) where.status = status;
 
   const skip = (Number(page) - 1) * Number(limit);
@@ -252,7 +271,7 @@ router.post("/:id/sign-disclaimer", async (req: Request, res: Response) => {
 });
 
 // Admin: update registration info
-router.put("/:id", requireAuth, async (req: Request, res: Response) => {
+router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const updateSchema = z.object({
     fullName: z.string().min(1),
     phone: z.string().min(9),
@@ -283,10 +302,16 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 
   const registration = await prisma.registration.findUnique({
     where: { id },
-    include: { distance: true },
+    include: { distance: true, event: { select: { createdById: true } } },
   });
   if (!registration) {
     res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  // EVENT_MANAGER can only edit registrations for their own events
+  if (req.adminRole === "EVENT_MANAGER" && registration.event.createdById !== req.adminId) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 
@@ -325,13 +350,23 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 });
 
 // Admin: delete registration
-router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
+router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const id = req.params.id as string;
-  const registration = await prisma.registration.findUnique({ where: { id } });
+  const registration = await prisma.registration.findUnique({
+    where: { id },
+    include: { event: { select: { createdById: true } } },
+  });
   if (!registration) {
     res.status(404).json({ error: "Not found" });
     return;
   }
+
+  // EVENT_MANAGER can only delete registrations for their own events
+  if (req.adminRole === "EVENT_MANAGER" && registration.event.createdById !== req.adminId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   await prisma.$transaction([
     prisma.payment.deleteMany({ where: { registrationId: id } }),
     prisma.registration.delete({ where: { id } }),
@@ -340,10 +375,23 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
 });
 
 // Admin: update bib manually
-router.patch("/:id/bib", requireAuth, async (req: Request, res: Response) => {
+router.patch("/:id/bib", requireAuth, async (req: AuthRequest, res: Response) => {
   const { bibNumber } = req.body;
   if (typeof bibNumber !== "number") {
     res.status(400).json({ error: "bibNumber must be a number" });
+    return;
+  }
+
+  const existing = await prisma.registration.findUnique({
+    where: { id: req.params.id as string },
+    include: { event: { select: { createdById: true } } },
+  });
+  if (!existing) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (req.adminRole === "EVENT_MANAGER" && existing.event.createdById !== req.adminId) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 
@@ -356,7 +404,7 @@ router.patch("/:id/bib", requireAuth, async (req: Request, res: Response) => {
 });
 
 // Admin: update registration status manually
-router.patch("/:id/status", requireAuth, async (req: Request, res: Response) => {
+router.patch("/:id/status", requireAuth, async (req: AuthRequest, res: Response) => {
   const { status } = req.body;
   if (!["PENDING", "PAID", "CANCELLED"].includes(status)) {
     res.status(400).json({ error: "Invalid status" });
@@ -365,10 +413,14 @@ router.patch("/:id/status", requireAuth, async (req: Request, res: Response) => 
 
   const registration = await prisma.registration.findUnique({
     where: { id: req.params.id as string },
-    include: { payment: true },
+    include: { payment: true, event: { select: { createdById: true } } },
   });
   if (!registration) {
     res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (req.adminRole === "EVENT_MANAGER" && registration.event.createdById !== req.adminId) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 
@@ -398,7 +450,7 @@ router.patch("/:id/status", requireAuth, async (req: Request, res: Response) => 
 });
 
 // Admin: send continue email (bulk)
-router.post("/admin/send-continue", requireAuth, async (req: Request, res: Response) => {
+router.post("/admin/send-continue", requireAuth, async (req: AuthRequest, res: Response) => {
   const { ids } = req.body as { ids?: string[] };
   if (!ids || !Array.isArray(ids) || ids.length === 0) {
     res.status(400).json({ error: "ids required" });
@@ -407,10 +459,15 @@ router.post("/admin/send-continue", requireAuth, async (req: Request, res: Respo
 
   const registrations = await prisma.registration.findMany({
     where: { id: { in: ids } },
-    include: { event: true },
+    include: { event: { select: { name: true, createdById: true } } },
   });
 
-  const targets = registrations.filter((r) => r.status === "PAID" && !r.disclaimerSignedAt && r.email);
+  // EVENT_MANAGER can only send emails for their own events
+  const allowed = req.adminRole === "SUPER_ADMIN"
+    ? registrations
+    : registrations.filter((r) => r.event.createdById === req.adminId);
+
+  const targets = allowed.filter((r) => r.status === "PAID" && !r.disclaimerSignedAt && r.email);
 
   await Promise.all(targets.map((r) =>
     sendContinueEmail({ to: r.email, fullName: r.fullName, registrationId: r.id, eventName: r.event.name })

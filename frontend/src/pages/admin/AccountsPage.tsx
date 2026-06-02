@@ -1,0 +1,196 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { api } from "@/lib/api";
+import { useAuth, type AdminRole } from "@/contexts/AuthContext";
+import { Navigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, X, Loader2, ShieldCheck, UserCog } from "lucide-react";
+
+interface AdminAccount {
+  id: string;
+  email: string;
+  name: string;
+  role: AdminRole;
+  createdAt: string;
+}
+
+const createSchema = z.object({
+  email: z.string().email("Email không hợp lệ"),
+  password: z.string().min(8, "Tối thiểu 8 ký tự"),
+  name: z.string().min(1, "Bắt buộc"),
+  role: z.enum(["SUPER_ADMIN", "EVENT_MANAGER"]),
+});
+
+type FormData = z.infer<typeof createSchema>;
+
+export function AdminAccountsPage() {
+  const { admin: currentAdmin, isSuperAdmin } = useAuth();
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+
+  if (!isSuperAdmin) return <Navigate to="/admin" replace />;
+
+  const { data: accounts = [], isLoading } = useQuery<AdminAccount[]>({
+    queryKey: ["admin-accounts"],
+    queryFn: () => api.get("/auth/admins").then((r) => r.data),
+  });
+
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
+    resolver: zodResolver(createSchema),
+    defaultValues: { role: "EVENT_MANAGER" },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: FormData) => api.post("/auth/admins", data).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-accounts"] });
+      setShowForm(false);
+      reset();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/auth/admins/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-accounts"] }),
+  });
+
+  const roleMutation = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: AdminRole }) =>
+      api.patch(`/auth/admins/${id}/role`, { role }).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-accounts"] }),
+  });
+
+  const roleInfo = (role: AdminRole) =>
+    role === "SUPER_ADMIN"
+      ? { label: "Super Admin", icon: ShieldCheck, color: "text-indigo-600 bg-indigo-50" }
+      : { label: "Quản lý sự kiện", icon: UserCog, color: "text-emerald-600 bg-emerald-50" };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Quản lý tài khoản</h1>
+          <p className="text-gray-500 text-sm mt-1">{accounts.length} tài khoản</p>
+        </div>
+        <Button onClick={() => setShowForm(true)}>
+          <Plus className="h-4 w-4 mr-1" /> Tạo tài khoản
+        </Button>
+      </div>
+
+      {/* Create form modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between p-5 border-b">
+              <h2 className="font-bold text-lg">Tạo tài khoản mới</h2>
+              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit((d) => createMutation.mutate(d))} className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <Label>Họ tên *</Label>
+                <Input {...register("name")} />
+                {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email *</Label>
+                <Input type="email" {...register("email")} />
+                {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Mật khẩu *</Label>
+                <Input type="password" {...register("password")} />
+                {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Vai trò</Label>
+                <Select value={watch("role")} onValueChange={(v: any) => setValue("role", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EVENT_MANAGER">Quản lý sự kiện</SelectItem>
+                    <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Hủy</Button>
+                <Button type="submit" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Tạo tài khoản"}
+                </Button>
+              </div>
+              {createMutation.isError && (
+                <p className="text-sm text-red-500 text-center">
+                  {(createMutation.error as any)?.response?.data?.error ?? "Lỗi tạo tài khoản"}
+                </p>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Accounts list */}
+      {isLoading ? (
+        <div className="text-center py-12"><Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" /></div>
+      ) : (
+        <div className="bg-white rounded-2xl border divide-y">
+          {accounts.map((account) => {
+            const { label, icon: Icon, color } = roleInfo(account.role);
+            const isSelf = account.id === currentAdmin?.id;
+            return (
+              <div key={account.id} className="flex items-center gap-4 p-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-gray-900">{account.name}</span>
+                    {isSelf && <Badge variant="outline" className="text-xs">Bạn</Badge>}
+                  </div>
+                  <p className="text-sm text-gray-400 truncate">{account.email}</p>
+                </div>
+
+                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${color}`}>
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </div>
+
+                {!isSelf && (
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={account.role}
+                      onValueChange={(v: AdminRole) => roleMutation.mutate({ id: account.id, role: v })}
+                    >
+                      <SelectTrigger className="h-8 w-40 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EVENT_MANAGER">Quản lý sự kiện</SelectItem>
+                        <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                      onClick={() => confirm(`Xóa tài khoản "${account.name}"?`) && deleteMutation.mutate(account.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {accounts.length === 0 && (
+            <div className="text-center py-12 text-gray-400">Chưa có tài khoản nào</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
