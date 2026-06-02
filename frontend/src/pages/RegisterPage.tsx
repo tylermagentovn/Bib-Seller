@@ -274,7 +274,11 @@ function RegisterForm({ event }: { event: Event }) {
     mutationFn: (data: Omit<FormData, "disclaimer">) =>
       api.post("/registrations", { ...data, eventId: event.id }).then((r) => r.data),
     onSuccess: (reg) => {
-      navigate(`/payment/${reg.id}`);
+      if (reg.status === "PAID") {
+        navigate(`/payment/${reg.id}/success?code=00`);
+      } else {
+        navigate(`/payment/${reg.id}`);
+      }
     },
   });
 
@@ -578,6 +582,8 @@ function RegisterForm({ event }: { event: Event }) {
               <Button type="submit" size="lg" className="w-full" disabled={mutation.isPending}>
                 {mutation.isPending ? (
                   <><Loader2 className="h-4 w-4 animate-spin" /> Đang xử lý...</>
+                ) : selectedDistance?.price === 0 ? (
+                  "Đăng ký miễn phí"
                 ) : (
                   "Đăng ký & Thanh toán"
                 )}

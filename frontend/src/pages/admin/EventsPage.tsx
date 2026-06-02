@@ -41,7 +41,7 @@ const DEFAULT_FIELD_CONFIG: FieldConfig = {
 const distanceSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, "Bắt buộc"),
-  price: z.number().positive("Phải > 0"),
+  price: z.number().min(0, "Phải ≥ 0"),
   maxSlots: z.number().int().positive("Phải > 0"),
   bibStart: z.number().int().positive("Phải > 0"),
   bibEnd: z.number().int().positive("Phải > 0"),

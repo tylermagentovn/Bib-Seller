@@ -52,7 +52,7 @@ router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) =>
 const distanceSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
-  price: z.number().int().positive(),
+  price: z.number().int().min(0),
   maxSlots: z.number().int().positive(),
   bibStart: z.number().int().positive(),
   bibEnd: z.number().int().positive(),

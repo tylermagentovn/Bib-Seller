@@ -90,6 +90,7 @@ router.post("/", async (req: Request, res: Response) => {
     }
   }
 
+  const isFree = distance.price === 0;
   const timeoutMinutes = Number(process.env.PAYMENT_TIMEOUT_MINUTES ?? 15);
   const expiresAt = new Date(Date.now() + timeoutMinutes * 60 * 1000);
 
@@ -109,7 +110,8 @@ router.post("/", async (req: Request, res: Response) => {
       medicalConditions: registrationData.medicalConditions ?? null,
       emergencyName: registrationData.emergencyName ?? null,
       emergencyPhone: registrationData.emergencyPhone ?? null,
-      payment: {
+      status: isFree ? "PAID" : "PENDING",
+      payment: isFree ? undefined : {
         create: {
           amount: distance.price,
           expiresAt,
