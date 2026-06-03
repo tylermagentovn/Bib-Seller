@@ -36,12 +36,34 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(6, "Mật khẩu mới ít nhất 6 ký tự"),
 });
 
+const memberUpdateSchema = z.object({
+  id: z.string(),
+  fullName: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().nullable().optional(),
+  gender: z.string().nullable().optional(),
+  dob: z.string().nullable().optional(),
+  idNumber: z.string().nullable().optional(),
+  shirtSize: z.string().nullable().optional(),
+  bloodType: z.string().nullable().optional(),
+  medicalConditions: z.string().nullable().optional(),
+  emergencyName: z.string().nullable().optional(),
+  emergencyPhone: z.string().nullable().optional(),
+});
+
 const updateRegistrationSchema = z.object({
   fullName: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
-  emergencyName: z.string().optional(),
-  emergencyPhone: z.string().optional(),
+  email: z.string().nullable().optional(),
+  gender: z.string().nullable().optional(),
+  dob: z.string().nullable().optional(),
+  idNumber: z.string().nullable().optional(),
+  shirtSize: z.string().nullable().optional(),
+  bloodType: z.string().nullable().optional(),
+  medicalConditions: z.string().nullable().optional(),
+  emergencyName: z.string().nullable().optional(),
+  emergencyPhone: z.string().nullable().optional(),
+  members: z.array(memberUpdateSchema).optional(),
 });
 
 function makeToken(userId: string): string {
@@ -188,21 +210,50 @@ router.put("/me/registrations/:id", requireUserAuth, async (req: UserRequest, re
     return;
   }
 
-  const updated = await prisma.registration.update({
-    where: { id: req.params.id as string },
-    data: {
-      fullName: parsed.data.fullName,
-      phone: parsed.data.phone,
-      email: parsed.data.email || null,
-      emergencyName: parsed.data.emergencyName,
-      emergencyPhone: parsed.data.emergencyPhone,
-    },
-    include: {
-      event: true,
-      distance: true,
-      payment: true,
-      teamMembers: { orderBy: { memberIndex: "asc" } },
-    },
+  const { members, ...regFields } = parsed.data;
+
+  const REG_INCLUDE = {
+    event: true,
+    distance: true,
+    payment: true,
+    teamMembers: { orderBy: { memberIndex: "asc" } },
+  } as const;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.registration.update({
+      where: { id: req.params.id as string },
+      data: {
+        ...regFields,
+        email: regFields.email || null,
+        dob: regFields.dob !== undefined ? (regFields.dob ? new Date(regFields.dob) : null) : undefined,
+      },
+    });
+
+    if (members && members.length > 0) {
+      await Promise.all(members.map((m) =>
+        tx.teamMember.update({
+          where: { id: m.id },
+          data: {
+            fullName: m.fullName,
+            phone: m.phone,
+            email: m.email || null,
+            gender: m.gender || null,
+            dob: m.dob !== undefined ? (m.dob ? new Date(m.dob) : null) : undefined,
+            idNumber: m.idNumber || null,
+            shirtSize: m.shirtSize || null,
+            bloodType: m.bloodType || null,
+            medicalConditions: m.medicalConditions || null,
+            emergencyName: m.emergencyName || null,
+            emergencyPhone: m.emergencyPhone || null,
+          },
+        })
+      ));
+    }
+
+    return tx.registration.findUnique({
+      where: { id: req.params.id as string },
+      include: REG_INCLUDE,
+    });
   });
   res.json(updated);
 });

@@ -120,6 +120,7 @@ export interface Event {
   eventDate: string | null;
   status: "DRAFT" | "PUBLISHED" | "CLOSED";
   fieldConfig: FieldConfig | null;
+  allowMultipleRegistrations: boolean;
   distances: Distance[];
   createdAt: string;
 }

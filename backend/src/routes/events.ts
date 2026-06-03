@@ -76,6 +76,7 @@ const eventSchema = z.object({
   eventDate: z.string().optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "CLOSED"]).default("DRAFT"),
   fieldConfig: z.record(z.string(), fieldVisibilitySchema).optional().nullable(),
+  allowMultipleRegistrations: z.boolean().default(false),
   distances: z.array(distanceSchema).min(1),
 });
 

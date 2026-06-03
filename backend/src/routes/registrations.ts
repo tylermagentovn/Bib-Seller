@@ -61,7 +61,7 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
   // Validate event + distance exist
   const distance = await prisma.distance.findFirst({
     where: { id: data.distanceId, eventId: data.eventId },
-    include: { event: true },
+    include: { event: { select: { allowMultipleRegistrations: true } } },
   });
   if (!distance) {
     res.status(404).json({ error: "Event or distance not found" });
@@ -75,6 +75,17 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
   if (paid >= distance.maxSlots) {
     res.status(409).json({ error: "This distance is fully booked" });
     return;
+  }
+
+  // Check duplicate registration per event (logged-in users only, if event disallows multiple)
+  if (req.userId && !distance.event.allowMultipleRegistrations) {
+    const existing = await prisma.registration.findFirst({
+      where: { userId: req.userId, eventId: data.eventId, status: { not: "CANCELLED" } },
+    });
+    if (existing) {
+      res.status(409).json({ error: "ALREADY_REGISTERED" });
+      return;
+    }
   }
 
   // Validate team members for RELAY distances

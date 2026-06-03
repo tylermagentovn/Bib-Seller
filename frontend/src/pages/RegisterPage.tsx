@@ -642,9 +642,18 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
                 )}
               </Button>
               {mutation.isError && (
-                <p className="text-xs text-red-500 text-center mt-2">
-                  {(mutation.error as any)?.response?.data?.error ?? "Có lỗi xảy ra, vui lòng thử lại"}
-                </p>
+                (mutation.error as any)?.response?.data?.error === "ALREADY_REGISTERED" ? (
+                  <div className="text-center mt-2">
+                    <p className="text-xs text-amber-600">Bạn đã đăng ký sự kiện này rồi.</p>
+                    <Link to="/account/bibs" className="text-xs text-indigo-600 underline">
+                      Xem thông tin đăng ký của bạn →
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-xs text-red-500 text-center mt-2">
+                    {(mutation.error as any)?.response?.data?.error ?? "Có lỗi xảy ra, vui lòng thử lại"}
+                  </p>
+                )
               )}
             </div>
           </form>

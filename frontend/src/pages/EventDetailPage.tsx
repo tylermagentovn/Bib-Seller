@@ -2,19 +2,31 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { api, type Event } from "@/lib/api";
+import { api, userApi, type Event, type Registration } from "@/lib/api";
+import { useUser } from "@/contexts/UserContext";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Users, ArrowRight, ChevronRight, AlertCircle } from "lucide-react";
+import { Calendar, MapPin, Users, ArrowRight, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react";
 
 export function EventDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  const { user } = useUser();
 
   const { data: event, isLoading, isError } = useQuery<Event>({
     queryKey: ["event", slug],
     queryFn: () => api.get(`/events/${slug}`).then((r) => r.data),
   });
+
+  const { data: userRegistrations } = useQuery<Registration[]>({
+    queryKey: ["user-registrations"],
+    queryFn: () => userApi.get("/users/me/registrations").then((r) => r.data),
+    enabled: !!user,
+  });
+
+  const alreadyRegistered = !!event
+    && !event.allowMultipleRegistrations
+    && userRegistrations?.some((r) => r.eventId === event.id && r.status !== "CANCELLED");
 
   if (isLoading) {
     return (
@@ -126,7 +138,16 @@ export function EventDetailPage() {
                 </div>
               ))}
             </div>
-            {event.status === "PUBLISHED" ? (
+            {alreadyRegistered ? (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+                <div className="flex items-center justify-center gap-1.5 text-green-700 font-medium text-sm mb-1">
+                  <CheckCircle2 className="h-4 w-4" /> Bạn đã đăng ký sự kiện này
+                </div>
+                <Button asChild variant="link" size="sm" className="text-indigo-600 h-auto p-0 text-sm">
+                  <Link to="/account/bibs">Xem thông tin đăng ký →</Link>
+                </Button>
+              </div>
+            ) : event.status === "PUBLISHED" ? (
               <Button asChild size="lg" className="w-full">
                 <Link to={`/events/${event.slug}/register`}>
                   Đăng ký ngay <ArrowRight className="h-4 w-4" />
@@ -137,9 +158,11 @@ export function EventDetailPage() {
                 Chưa mở đăng ký
               </Button>
             )}
-            <p className="text-xs text-gray-400 text-center mt-3">
-              Thanh toán qua QR code. Hoàn tất trong vài phút.
-            </p>
+            {!alreadyRegistered && (
+              <p className="text-xs text-gray-400 text-center mt-3">
+                Thanh toán qua QR code. Hoàn tất trong vài phút.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-4 text-sm text-gray-600">
@@ -229,7 +252,16 @@ export function EventDetailPage() {
                   </div>
                 ))}
               </div>
-              {event.status === "PUBLISHED" ? (
+              {alreadyRegistered ? (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+                  <div className="flex items-center justify-center gap-1.5 text-green-700 font-medium text-sm mb-1">
+                    <CheckCircle2 className="h-4 w-4" /> Bạn đã đăng ký sự kiện này
+                  </div>
+                  <Button asChild variant="link" size="sm" className="text-indigo-600 h-auto p-0 text-sm">
+                    <Link to="/account/bibs">Xem thông tin đăng ký →</Link>
+                  </Button>
+                </div>
+              ) : event.status === "PUBLISHED" ? (
                 <Button asChild size="lg" className="w-full">
                   <Link to={`/events/${event.slug}/register`}>
                     Đăng ký ngay <ArrowRight className="h-4 w-4" />
@@ -240,9 +272,11 @@ export function EventDetailPage() {
                   Chưa mở đăng ký
                 </Button>
               )}
-              <p className="text-xs text-gray-400 text-center mt-3">
-                Thanh toán qua QR code. Hoàn tất trong vài phút.
-              </p>
+              {!alreadyRegistered && (
+                <p className="text-xs text-gray-400 text-center mt-3">
+                  Thanh toán qua QR code. Hoàn tất trong vài phút.
+                </p>
+              )}
             </div>
 
           </div>

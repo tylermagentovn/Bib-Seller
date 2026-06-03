@@ -62,6 +62,7 @@ const eventSchema = z.object({
   location: z.string().optional(),
   eventDate: z.string().optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "CLOSED"]),
+  allowMultipleRegistrations: z.boolean(),
   distances: z.array(distanceSchema).min(1, "Cần ít nhất 1 cự ly"),
 });
 
@@ -79,7 +80,7 @@ export function AdminEventsPage() {
 
   const { register, handleSubmit, control, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(eventSchema),
-    defaultValues: { status: "DRAFT", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
+    defaultValues: { status: "DRAFT", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "distances" });
@@ -94,7 +95,7 @@ export function AdminEventsPage() {
   const [fieldConfig, setFieldConfig] = useState<FieldConfig>({ ...DEFAULT_FIELD_CONFIG });
 
   const openCreate = () => {
-    reset({ status: "DRAFT", raceKitDescription: "", distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
+    reset({ status: "DRAFT", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
     setShirtSizeUrl("");
     setRaceKitUrl("");
     setShirtUploadedUrls([]);
@@ -118,6 +119,7 @@ export function AdminEventsPage() {
       location: event.location ?? "",
       eventDate: event.eventDate ? event.eventDate.slice(0, 10) : "",
       status: event.status,
+      allowMultipleRegistrations: (event as any).allowMultipleRegistrations ?? false,
       distances: event.distances.map((d) => ({
         id: d.id,
         name: d.name,
@@ -379,6 +381,19 @@ export function AdminEventsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Cho phép đăng ký nhiều lần</Label>
+                  <Select
+                    value={watch("allowMultipleRegistrations") ? "yes" : "no"}
+                    onValueChange={(v) => setValue("allowMultipleRegistrations", v === "yes")}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="no">Không — mỗi user 1 lần</SelectItem>
+                      <SelectItem value="yes">Có — không giới hạn</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Field config */}
@@ -545,6 +560,9 @@ export function AdminEventsPage() {
                     {event.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{event.location}</span>}
                     <span>{event.distances?.length ?? 0} cự ly</span>
                     <span>{event._count?.registrations ?? 0} đăng ký</span>
+                    {event.allowMultipleRegistrations && (
+                      <span className="text-amber-500">Đăng ký nhiều lần</span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
