@@ -19,7 +19,7 @@ app.use(cors({ origin: process.env.FRONTEND_URL ?? "*" }));
 app.use(express.json());
 
 // Serve uploaded files
-app.use("/uploads", express.static(path.join(__dirname, "..", "public", "uploads")));
+app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);

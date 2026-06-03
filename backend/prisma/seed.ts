@@ -17,6 +17,7 @@ async function main() {
       email: "admin@bibregister.com",
       password,
       name: "Super Admin",
+      role: "SUPER_ADMIN",
     },
   });
   console.log("Admin seeded:", admin.email);

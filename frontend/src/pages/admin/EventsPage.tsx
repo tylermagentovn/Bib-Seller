@@ -86,20 +86,26 @@ export function AdminEventsPage() {
   const { fields, append, remove } = useFieldArray({ control, name: "distances" });
   const [uploading, setUploading] = useState(false);
   const [uploadingRace, setUploadingRace] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [shirtUploadedUrls, setShirtUploadedUrls] = useState<string[]>([]);
   const [raceKitUploadedUrls, setRaceKitUploadedUrls] = useState<string[]>([]);
+  const [coverUploadedUrl, setCoverUploadedUrl] = useState("");
   const shirtInputRef = useRef<HTMLInputElement>(null);
   const raceKitInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [shirtSizeUrl, setShirtSizeUrl] = useState("");
   const [raceKitUrl, setRaceKitUrl] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
   const [fieldConfig, setFieldConfig] = useState<FieldConfig>({ ...DEFAULT_FIELD_CONFIG });
 
   const openCreate = () => {
     reset({ status: "DRAFT", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
     setShirtSizeUrl("");
     setRaceKitUrl("");
+    setCoverUrl("");
     setShirtUploadedUrls([]);
     setRaceKitUploadedUrls([]);
+    setCoverUploadedUrl("");
     setFieldConfig({ ...DEFAULT_FIELD_CONFIG });
     setEditing(null);
     setShowForm(true);
@@ -133,8 +139,10 @@ export function AdminEventsPage() {
     });
     setShirtSizeUrl((event as any).shirtSizeImageUrl ?? "");
     setRaceKitUrl((event as any).raceKitImageUrl ?? "");
+    setCoverUrl(event.imageUrl ?? "");
     setShirtUploadedUrls([]);
     setRaceKitUploadedUrls([]);
+    setCoverUploadedUrl("");
     setFieldConfig({ ...DEFAULT_FIELD_CONFIG, ...(event.fieldConfig ?? {}) });
     setEditing(event);
     setShowForm(true);
@@ -182,7 +190,7 @@ export function AdminEventsPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit((d) => { const payload = { ...d, shirtSizeImageUrl: shirtSizeUrl, raceKitImageUrl: raceKitUrl, fieldConfig }; saveMutation.mutate(payload); })} className="p-5 space-y-4">
+            <form onSubmit={handleSubmit((d) => { const payload = { ...d, imageUrl: coverUrl, shirtSizeImageUrl: shirtSizeUrl, raceKitImageUrl: raceKitUrl, fieldConfig }; saveMutation.mutate(payload); })} className="p-5 space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Tên sự kiện *</Label>
@@ -225,9 +233,56 @@ export function AdminEventsPage() {
                   <Label>Ngày tổ chức</Label>
                   <Input type="date" {...register("eventDate")} />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>URL hình ảnh</Label>
-                  <Input {...register("imageUrl")} placeholder="https://..." />
+                {/* Cover image — full row */}
+                <div className="space-y-2 md:col-span-2 border rounded-xl p-4 bg-gray-50">
+                  <Label className="text-sm font-medium">Ảnh bìa sự kiện</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={coverUrl}
+                      onChange={(e) => setCoverUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={uploadingCover}
+                      onClick={() => coverInputRef.current?.click()}
+                    >
+                      {uploadingCover ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      <span className="ml-1.5">{uploadingCover ? "Đang tải..." : "Tải ảnh lên"}</span>
+                    </Button>
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingCover(true);
+                        try {
+                          const fd = new FormData();
+                          fd.append("file", file);
+                          const res = await api.post("/uploads", fd, { headers: { "Content-Type": "multipart/form-data" } });
+                          const url = res.data.url as string;
+                          setCoverUrl(url);
+                          setCoverUploadedUrl(url);
+                        } catch (err) {
+                          console.error(err);
+                          alert("Upload thất bại");
+                        } finally {
+                          setUploadingCover(false);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                  </div>
+                  {coverUploadedUrl && (
+                    <img src={coverUploadedUrl} alt="Cover preview" className="mt-2 h-24 w-full object-cover rounded-lg" />
+                  )}
                 </div>
                 {/* Shirt size image — full row */}
                 <div className="space-y-2 md:col-span-2 border rounded-xl p-4 bg-gray-50">

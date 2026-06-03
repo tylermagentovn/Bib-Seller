@@ -52,7 +52,7 @@ sudo -u postgres psql
 
 ```sql
 CREATE DATABASE bib_register;
-CREATE USER bib_user WITH PASSWORD 'strong_password_here';
+CREATE USER bib_user WITH PASSWORD 'Kinightaka123';
 GRANT ALL PRIVILEGES ON DATABASE bib_register TO bib_user;
 \q
 ```
@@ -77,8 +77,8 @@ cd /var/www/bib-register/backend
 Tạo file `.env`:
 
 ```env
-DATABASE_URL="postgresql://bib_user:strong_password_here@localhost:5432/bib_register"
-JWT_SECRET="random_secret_string_at_least_32_chars"
+DATABASE_URL="postgresql://bib_user:Kinightaka123@localhost:5432/bib_register"
+JWT_SECRET="hkvihXbc1w3oagoscr4YaWkETcoLd8VBD6UxD329x1O"
 PORT=3001
 NODE_ENV=production
 
@@ -88,6 +88,11 @@ SEPAY_BANK_ACCOUNT=
 SEPAY_BANK_NAME=
 SEPAY_ACCOUNT_NAME=
 SEPAY_WEBHOOK_SECRET=
+
+# PayOS
+PAYOS_CLIENT_ID=""
+PAYOS_API_KEY=""
+PAYOS_CHECKSUM_KEY=""
 
 # Email (Gmail App Password)
 SMTP_USER=
@@ -149,8 +154,6 @@ VITE_API_URL=https://yourdomain.com/api
 ```bash
 npm install
 npm run build
-sudo mkdir -p /var/www/bib-frontend
-sudo cp -r dist/. /var/www/bib-frontend/
 ```
 
 ---
@@ -162,14 +165,19 @@ Tạo file `/etc/nginx/sites-available/bib-register`:
 ```nginx
 server {
     listen 80;
-    server_name yourdomain.com www.yourdomain.com;
+    server_name bib1s.com www.bib1s.com;
 
     # Serve frontend (React SPA)
-    root /var/www/bib-frontend;
+    root /var/www/bib-register/frontend/dist;
     index index.html;
 
     location / {
         try_files $uri $uri/ /index.html;
+    }
+
+    # Serve uploaded files từ backend
+    location /uploads/ {
+        proxy_pass http://localhost:3001/uploads/;
     }
 
     # Proxy API sang backend
@@ -200,7 +208,7 @@ sudo systemctl reload nginx
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+sudo certbot --nginx -d bib1s.com -d www.bib1s.com
 sudo certbot renew --dry-run
 ```
 
@@ -247,7 +255,6 @@ pm2 restart bib-backend
 cd ../frontend
 npm install
 npm run build
-sudo cp -r dist/. /var/www/bib-frontend/
 ```
 
 > Làm backend xong mới làm frontend — tránh OOM trên VPS 1GB RAM.
