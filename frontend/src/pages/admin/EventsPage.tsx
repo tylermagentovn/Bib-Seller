@@ -14,6 +14,7 @@ import { Plus, Pencil, Trash2, X, Loader2, Calendar, MapPin, Upload } from "luci
 
 const FIELD_CONFIG_ITEMS: { key: keyof FieldConfig; label: string }[] = [
   { key: "fullName", label: "Họ và tên" },
+  { key: "gender", label: "Giới tính" },
   { key: "dob", label: "Ngày sinh" },
   { key: "phone", label: "Số điện thoại" },
   { key: "email", label: "Email" },
@@ -27,6 +28,7 @@ const FIELD_CONFIG_ITEMS: { key: keyof FieldConfig; label: string }[] = [
 
 const DEFAULT_FIELD_CONFIG: FieldConfig = {
   fullName: "required",
+  gender: "hidden",
   dob: "required",
   phone: "required",
   email: "required",

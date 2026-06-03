@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Registration, type TeamMember } from "@/lib/api";
-import { MEMBER_FIELD_DEFS, SHIRT_SIZES, BLOOD_TYPES, initFieldValue, normalizeFieldValue } from "@/lib/memberFields";
+import { MEMBER_FIELD_DEFS, GENDERS, SHIRT_SIZES, BLOOD_TYPES, initFieldValue, normalizeFieldValue } from "@/lib/memberFields";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Loader2, Pencil, ChevronLeft, ChevronRight, Search,
-  X, User, Phone, Mail, Calendar, Shield, CreditCard,
+  X, User, Phone, Mail, Calendar, Shield, CreditCard, CircleUser,
   PenLine, Users, CheckCircle, Clock, Download, Trash2, RefreshCw,
   BadgeCheck, Shirt, Droplets, HeartPulse,
 } from "lucide-react";
@@ -117,6 +117,7 @@ function EditInfoModal({ reg, onClose }: {
 
   const [fullName, setFullName] = useState(reg.fullName ?? "");
   const [phone, setPhone] = useState(reg.phone ?? "");
+  const [gender, setGender] = useState(reg.gender ?? "_none_");
   const [email, setEmail] = useState(reg.email ?? "");
   const [dob, setDob] = useState(reg.dob ? reg.dob.slice(0, 10) : "");
   const [idNumber, setIdNumber] = useState(reg.idNumber ?? "");
@@ -153,6 +154,7 @@ function EditInfoModal({ reg, onClose }: {
   const handleSubmit = () => {
     const payload: Record<string, unknown> = { fullName, phone, email };
     if (!isRelay) {
+      payload.gender = gender === "_none_" ? null : gender || null;
       payload.dob = dob;
       payload.idNumber = idNumber || null;
       payload.shirtSize = shirtSize === "_none_" ? null : shirtSize || null;
@@ -236,7 +238,17 @@ function EditInfoModal({ reg, onClose }: {
               <div className="border-t pt-4">
                 <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Thông tin bổ sung</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Giới tính</label>
+                    <Select value={gender} onValueChange={setGender}>
+                      <SelectTrigger><SelectValue placeholder="Chọn giới tính" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none_">—</SelectItem>
+                        {GENDERS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Số CCCD</label>
                     <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Nhập số CCCD" />
                   </div>
@@ -448,6 +460,15 @@ function DetailModal({ reg, onClose, onEditBib, onEditStatus, onEditInfo }: {
                   <div className="flex justify-between w-full">
                     <span className="text-gray-500">Email</span>
                     <span className="font-medium text-right break-all max-w-[60%]">{reg.email}</span>
+                  </div>
+                </div>
+              )}
+              {reg.gender != null && (
+                <div className="flex items-center gap-2.5">
+                  <CircleUser className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex justify-between w-full">
+                    <span className="text-gray-500">Giới tính</span>
+                    <span className="font-medium">{reg.gender}</span>
                   </div>
                 </div>
               )}
