@@ -1,7 +1,8 @@
 import type { LucideIcon } from "lucide-react";
-import { Calendar, BadgeCheck, Shirt, Droplets, HeartPulse, Shield } from "lucide-react";
+import { Calendar, BadgeCheck, Shirt, Droplets, HeartPulse, Shield, CircleUser } from "lucide-react";
 import type { FieldConfig } from "@/lib/api";
 
+export const GENDERS = ["Nam", "Nữ", "Khác"] as const;
 export const SHIRT_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
 export const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Không biết"];
 
@@ -22,6 +23,16 @@ export interface MemberFieldDef {
 }
 
 export const MEMBER_FIELD_DEFS: MemberFieldDef[] = [
+  {
+    key: "gender",
+    label: "Giới tính",
+    type: "select",
+    defaultValue: "_none_",
+    configKey: "gender",
+    options: GENDERS,
+    errorMessage: "Vui lòng chọn giới tính",
+    displayIcon: CircleUser,
+  },
   {
     key: "dob",
     label: "Ngày sinh",

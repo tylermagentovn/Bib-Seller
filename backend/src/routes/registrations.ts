@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth";
+import { optionalUserAuth, UserRequest } from "../middleware/userAuth";
 import { appendRegistrationToSheet } from "../services/sheets";
 import { sendContinueEmail } from "../services/email";
 
@@ -10,6 +11,7 @@ const router = Router();
 const teamMemberSchema = z.object({
   fullName: z.string().min(1),
   phone: z.string().min(9),
+  gender: z.string().nullable().optional(),
   email: z.string().email().optional().or(z.literal("")),
   dob: z.string().optional(),
   idNumber: z.string().nullable().optional(),
@@ -25,6 +27,7 @@ const registrationSchema = z.object({
   distanceId: z.string().min(1),
   fullName: z.string().optional(),
   phone: z.string().optional(),
+  gender: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   dob: z.string().optional(),
   idNumber: z.string().optional(),
@@ -45,8 +48,8 @@ async function getEventManagerEventIds(adminId: string): Promise<string[]> {
   return events.map((e) => e.id);
 }
 
-// Public: create registration
-router.post("/", async (req: Request, res: Response) => {
+// Public: create registration (attach userId if logged in)
+router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
   const parsed = registrationSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -102,6 +105,7 @@ router.post("/", async (req: Request, res: Response) => {
       distanceId: registrationData.distanceId,
       fullName: registrationData.fullName ?? null,
       phone: registrationData.phone ?? null,
+      gender: registrationData.gender || null,
       email: registrationData.email || null,
       dob: registrationData.dob ? new Date(registrationData.dob) : null,
       idNumber: registrationData.idNumber ?? null,
@@ -110,6 +114,7 @@ router.post("/", async (req: Request, res: Response) => {
       medicalConditions: registrationData.medicalConditions ?? null,
       emergencyName: registrationData.emergencyName ?? null,
       emergencyPhone: registrationData.emergencyPhone ?? null,
+      userId: req.userId ?? null,
       status: isFree ? "PAID" : "PENDING",
       payment: isFree ? undefined : {
         create: {
@@ -124,6 +129,7 @@ router.post("/", async (req: Request, res: Response) => {
                 memberIndex: i + 1,
                 fullName: m.fullName,
                 phone: m.phone,
+                gender: m.gender || null,
                 email: m.email || null,
                 dob: m.dob ? new Date(m.dob) : null,
                 idNumber: m.idNumber ?? null,
@@ -310,6 +316,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const updateSchema = z.object({
     fullName: z.string().optional(),
     phone: z.string().optional(),
+    gender: z.string().nullable().optional(),
     email: z.string().email().optional().or(z.literal("")),
     dob: z.string().optional(),
     idNumber: z.string().nullable().optional(),
@@ -359,6 +366,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
           memberIndex: i + 1,
           fullName: m.fullName,
           phone: m.phone,
+          gender: m.gender || null,
           email: m.email || null,
           dob: m.dob ? new Date(m.dob) : null,
           idNumber: m.idNumber ?? null,

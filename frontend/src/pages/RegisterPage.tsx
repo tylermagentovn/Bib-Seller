@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { api, type Event, type FieldConfig, type FieldVisibility } from "@/lib/api";
-import { MEMBER_FIELD_DEFS, SHIRT_SIZES, BLOOD_TYPES, type MemberFieldDef } from "@/lib/memberFields";
+import { api, userApi, type Event, type FieldConfig, type FieldVisibility } from "@/lib/api";
+import { useUser } from "@/contexts/UserContext";
+import { MEMBER_FIELD_DEFS, GENDERS, SHIRT_SIZES, BLOOD_TYPES, type MemberFieldDef } from "@/lib/memberFields";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +17,10 @@ import { ArrowLeft, Loader2, Users, Plus, X } from "lucide-react";
 
 const DEFAULT_FIELD_CONFIG: Required<FieldConfig> = {
   fullName: "required",
-  dob: "required",
   phone: "required",
+  gender: "hidden",
   email: "required",
+  dob: "required",
   idNumber: "hidden",
   shirtSize: "hidden",
   bloodType: "hidden",
@@ -34,6 +36,7 @@ function vis(cfg: FieldConfig, key: keyof FieldConfig): FieldVisibility {
 type MemberFormData = {
   fullName: string;
   phone: string;
+  gender?: string;
   email?: string;
   dob?: string;
   idNumber?: string;
@@ -49,6 +52,7 @@ type FormData = {
   disclaimer: boolean;
   fullName?: string;
   phone?: string;
+  gender?: string;
   email?: string;
   dob?: string;
   idNumber?: string;
@@ -93,6 +97,7 @@ function buildSchema(cfg: FieldConfig, isRelay: boolean) {
       ...base,
       fullName: z.string().min(2, "Họ tên đội trưởng phải có ít nhất 2 ký tự"),
       phone: z.string().min(9, "Số điện thoại không hợp lệ"),
+      gender: z.string().optional(),
       email: z.string().email("Email không hợp lệ"),
       dob: z.string().optional(),
       idNumber: z.string().optional(),
@@ -112,6 +117,9 @@ function buildSchema(cfg: FieldConfig, isRelay: boolean) {
       : z.string().optional(),
     phone: show("phone")
       ? req("phone") ? z.string().min(9, "Số điện thoại không hợp lệ") : z.string().optional()
+      : z.string().optional(),
+    gender: show("gender")
+      ? req("gender") ? z.string().min(1, "Vui lòng chọn giới tính") : z.string().optional()
       : z.string().optional(),
     email: show("email")
       ? req("email")
@@ -204,12 +212,23 @@ const EMPTY_MEMBER = {
 
 export function RegisterPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { data: event, isLoading } = useQuery<Event>({
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, isLoading: userLoading } = useUser();
+
+  const { data: event, isLoading: eventLoading } = useQuery<Event>({
     queryKey: ["event", slug],
     queryFn: () => api.get(`/events/${slug}`).then((r) => r.data),
   });
 
-  if (isLoading) {
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!userLoading && !user) {
+      navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`, { replace: true });
+    }
+  }, [user, userLoading]);
+
+  if (userLoading || eventLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
@@ -217,12 +236,12 @@ export function RegisterPage() {
     );
   }
 
-  if (!event) return null;
+  if (!event || !user) return null;
 
-  return <RegisterForm event={event} />;
+  return <RegisterForm event={event} user={user} />;
 }
 
-function RegisterForm({ event }: { event: Event }) {
+function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api").User }) {
   const navigate = useNavigate();
   const cfg = (event.fieldConfig as FieldConfig) ?? {};
   const show = (key: keyof FieldConfig) => vis(cfg, key) !== "hidden";
@@ -252,6 +271,24 @@ function RegisterForm({ event }: { event: Event }) {
     name: "teamMembers",
   });
 
+  // Auto-fill from user profile (once on mount)
+  const autoFilled = useRef(false);
+  useEffect(() => {
+    if (autoFilled.current) return;
+    autoFilled.current = true;
+    if (user.fullName) setValue("fullName", user.fullName);
+    if (user.phone) setValue("phone", user.phone);
+    if (user.gender) setValue("gender", user.gender);
+    if (user.email) setValue("email", user.email);
+    if (user.dob) setValue("dob", user.dob.slice(0, 10));
+    if (user.idNumber) setValue("idNumber", user.idNumber);
+    if (user.shirtSize) setValue("shirtSize", user.shirtSize);
+    if (user.bloodType) setValue("bloodType", user.bloodType);
+    if (user.medicalConditions) setValue("medicalConditions", user.medicalConditions);
+    if (user.emergencyName) setValue("emergencyName", user.emergencyName);
+    if (user.emergencyPhone) setValue("emergencyPhone", user.emergencyPhone);
+  }, []);
+
   const selectedDistanceId = watch("distanceId") ?? "";
   const selectedDistance = event.distances.find((d) => d.id === selectedDistanceId);
   const isRelay = selectedDistance?.type === "RELAY";
@@ -272,7 +309,7 @@ function RegisterForm({ event }: { event: Event }) {
 
   const mutation = useMutation({
     mutationFn: (data: Omit<FormData, "disclaimer">) =>
-      api.post("/registrations", { ...data, eventId: event.id }).then((r) => r.data),
+      userApi.post("/registrations", { ...data, eventId: event.id }).then((r) => r.data),
     onSuccess: (reg) => {
       if (reg.status === "PAID") {
         navigate(`/payment/${reg.id}/success?code=00`);
@@ -382,6 +419,22 @@ function RegisterForm({ event }: { event: Event }) {
                     <Label>{fieldLabel("email", "Email")}</Label>
                     <Input placeholder="email@example.com" type="email" {...register("email")} />
                     {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+                  </div>
+                )}
+                {show("gender") && (
+                  <div className="space-y-1.5">
+                    <Label>{fieldLabel("gender", "Giới tính")}</Label>
+                    <Select value={watch("gender") ?? ""} onValueChange={(v) => setValue("gender", v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn giới tính" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GENDERS.map((g) => (
+                          <SelectItem key={g} value={g}>{g}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.gender && <p className="text-xs text-red-500">{errors.gender.message}</p>}
                   </div>
                 )}
                 {show("dob") && (
