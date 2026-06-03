@@ -1,99 +1,264 @@
-# Hướng dẫn Deploy lên VPS Ubuntu 22
+# Hướng dẫn Deploy lên VPS Ubuntu 22 (Nginx + PM2)
+
+## Yêu cầu hệ thống
+
+- Ubuntu 22.04
+- 1 CPU, 1 GB RAM (bật swap 1GB trước khi deploy)
+- Domain đã trỏ A record về IP của VPS
+
+---
+
+## 0. Bật Swap (quan trọng với VPS 1GB RAM)
+
+```bash
+sudo fallocate -l 1G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+---
 
 ## 1. Chuẩn bị VPS
 
 ```bash
-# Cài Docker + Docker Compose
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-sudo apt install docker-compose-plugin -y
+sudo apt update && sudo apt upgrade -y
+
+# Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# PM2
+sudo npm install -g pm2
+
+# Nginx
+sudo apt install -y nginx
+
+# PostgreSQL
+sudo apt install -y postgresql postgresql-contrib
+
+# Git
+sudo apt install -y git
 ```
 
-## 2. Upload code lên VPS
+---
+
+## 2. Cấu hình PostgreSQL
 
 ```bash
-# Trên máy local
-scp -r bib-register/ user@your-vps-ip:/home/user/
+sudo -u postgres psql
 ```
 
-Hoặc dùng git:
-```bash
-git clone your-repo /home/user/bib-register
+```sql
+CREATE DATABASE bib_register;
+CREATE USER bib_user WITH PASSWORD 'strong_password_here';
+GRANT ALL PRIVILEGES ON DATABASE bib_register TO bib_user;
+\q
 ```
 
-## 3. Cấu hình môi trường
+---
+
+## 3. Clone code về VPS
 
 ```bash
-cd /home/user/bib-register/backend
-cp .env .env.production
-nano .env.production
+git clone <repo_url> /var/www/bib-register
+cd /var/www/bib-register
 ```
 
-Cập nhật các giá trị sau trong `.env.production`:
-- `DATABASE_URL` — thay đổi password mạnh hơn
-- `JWT_SECRET` — chuỗi random dài ≥ 32 ký tự
-- `SEPAY_API_TOKEN` — token thật từ SePay
-- `SEPAY_BANK_ACCOUNT`, `SEPAY_BANK_NAME`, `SEPAY_ACCOUNT_NAME`
-- `SEPAY_WEBHOOK_SECRET`
-- `SMTP_USER`, `SMTP_PASS` — Gmail App Password
-- `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `GOOGLE_SHEET_ID`
-- `FRONTEND_URL` — domain của bạn
+---
 
-## 4. Khởi động
+## 4. Cấu hình Backend
 
 ```bash
-cd /home/user/bib-register
-docker compose up -d --build
+cd /var/www/bib-register/backend
 ```
 
-## 5. Seed admin đầu tiên
+Tạo file `.env`:
+
+```env
+DATABASE_URL="postgresql://bib_user:strong_password_here@localhost:5432/bib_register"
+JWT_SECRET="random_secret_string_at_least_32_chars"
+PORT=3001
+NODE_ENV=production
+
+# SePay
+SEPAY_API_TOKEN=
+SEPAY_BANK_ACCOUNT=
+SEPAY_BANK_NAME=
+SEPAY_ACCOUNT_NAME=
+SEPAY_WEBHOOK_SECRET=
+
+# Email (Gmail App Password)
+SMTP_USER=
+SMTP_PASS=
+
+# Google Sheets (nếu dùng)
+GOOGLE_SERVICE_ACCOUNT_EMAIL=
+GOOGLE_PRIVATE_KEY=
+GOOGLE_SHEET_ID=
+
+FRONTEND_URL=https://yourdomain.com
+```
 
 ```bash
-docker compose exec backend npx tsx prisma/seed.ts
+npm install
+npx prisma migrate deploy
+npx prisma generate
+npm run build
+```
+
+Start với PM2:
+
+```bash
+pm2 start dist/index.js --name bib-backend
+pm2 save
+pm2 startup
+# Chạy lệnh mà pm2 startup in ra màn hình
+```
+
+---
+
+## 5. Seed admin lần đầu
+
+```bash
+cd /var/www/bib-register/backend
+npx tsx prisma/seed.ts
 ```
 
 Tài khoản mặc định:
 - Email: `admin@bibregister.com`
 - Password: `admin123456`
 
-**Đổi password ngay sau khi đăng nhập!**
+> **Đổi password ngay sau khi đăng nhập!**
 
-## 6. Cài HTTPS với Nginx + Certbot (ngoài Docker)
+---
+
+## 6. Build Frontend
 
 ```bash
-sudo apt install nginx certbot python3-certbot-nginx -y
-
-# Tạo config nginx reverse proxy
-sudo nano /etc/nginx/sites-available/bib-register
+cd /var/www/bib-register/frontend
 ```
+
+Tạo file `.env.production`:
+
+```env
+VITE_API_URL=https://yourdomain.com/api
+```
+
+```bash
+npm install
+npm run build
+sudo mkdir -p /var/www/bib-frontend
+sudo cp -r dist/. /var/www/bib-frontend/
+```
+
+---
+
+## 7. Cấu hình Nginx
+
+Tạo file `/etc/nginx/sites-available/bib-register`:
 
 ```nginx
 server {
-    server_name yourdomain.com;
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+
+    # Serve frontend (React SPA)
+    root /var/www/bib-frontend;
+    index index.html;
+
     location / {
-        proxy_pass http://localhost:80;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy API sang backend
+    location /api/ {
+        proxy_pass http://localhost:3001/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_cache_bypass $http_upgrade;
     }
+
+    # Upload file size
+    client_max_body_size 20M;
 }
 ```
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/bib-register /etc/nginx/sites-enabled/
-sudo certbot --nginx -d yourdomain.com
+sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## 7. Cấu hình SePay Webhook
+---
+
+## 8. HTTPS với Let's Encrypt
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+sudo certbot renew --dry-run
+```
+
+---
+
+## 9. Cấu hình SePay Webhook
 
 Trong dashboard SePay, thiết lập webhook URL:
+
 ```
 https://yourdomain.com/api/payments/webhook/sepay
 ```
 
-## 8. Xem logs
+---
+
+## 10. Kiểm tra sau deploy
 
 ```bash
-docker compose logs -f backend
-docker compose logs -f frontend
+pm2 status                          # backend đang chạy
+pm2 logs bib-backend --lines 50     # không có lỗi
+sudo systemctl status nginx         # nginx OK
+```
+
+Truy cập trình duyệt:
+- `https://yourdomain.com` — frontend load
+- `https://yourdomain.com/api/events` — API trả data JSON
+
+---
+
+## Workflow cập nhật code (sau lần đầu)
+
+```bash
+cd /var/www/bib-register
+git pull
+
+# Backend
+cd backend
+npm install
+npx prisma migrate deploy
+npm run build
+pm2 restart bib-backend
+
+# Frontend
+cd ../frontend
+npm install
+npm run build
+sudo cp -r dist/. /var/www/bib-frontend/
+```
+
+> Làm backend xong mới làm frontend — tránh OOM trên VPS 1GB RAM.
+
+---
+
+## Xem logs
+
+```bash
+pm2 logs bib-backend          # logs backend realtime
+pm2 logs bib-backend --lines 100  # 100 dòng gần nhất
+sudo tail -f /var/log/nginx/error.log   # nginx error
+sudo tail -f /var/log/nginx/access.log  # nginx access
 ```
