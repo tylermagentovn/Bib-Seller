@@ -1,8 +1,7 @@
 import axios from "axios";
 
-export const api = axios.create({
-  baseURL: "/api",
-});
+// Admin API — uses admin_token
+export const api = axios.create({ baseURL: "/api" });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("admin_token");
@@ -23,14 +22,50 @@ api.interceptors.response.use(
   }
 );
 
+// User API — uses user_token
+export const userApi = axios.create({ baseURL: "/api" });
+
+userApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem("user_token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+userApi.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem("user_token");
+    }
+    return Promise.reject(err);
+  }
+);
+
 // Types
+export interface User {
+  id: string;
+  email: string;
+  fullName: string | null;
+  phone: string | null;
+  gender: string | null;
+  dob: string | null;
+  idNumber: string | null;
+  shirtSize: string | null;
+  bloodType: string | null;
+  medicalConditions: string | null;
+  emergencyName: string | null;
+  emergencyPhone: string | null;
+  createdAt: string;
+}
+
 export type FieldVisibility = "required" | "optional" | "hidden";
 
 export interface FieldConfig {
   fullName?: FieldVisibility;
-  dob?: FieldVisibility;
   phone?: FieldVisibility;
+  gender?: FieldVisibility;
   email?: FieldVisibility;
+  dob?: FieldVisibility;
   idNumber?: FieldVisibility;
   shirtSize?: FieldVisibility;
   bloodType?: FieldVisibility;
@@ -45,6 +80,7 @@ export interface TeamMember {
   memberIndex: number;
   fullName: string;
   phone: string;
+  gender: string | null;
   email: string | null;
   dob: string | null;
   idNumber: string | null;
@@ -94,6 +130,7 @@ export interface Registration {
   distanceId: string;
   fullName: string;
   phone: string;
+  gender: string | null;
   email: string;
   dob: string;
   emergencyName: string | null;

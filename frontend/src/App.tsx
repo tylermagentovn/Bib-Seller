@@ -1,6 +1,8 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { type ReactNode } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { UserProvider, useUser } from "@/contexts/UserContext";
 import { Navbar } from "@/components/Navbar";
 import { AdminLayout } from "@/components/AdminLayout";
 
@@ -9,12 +11,24 @@ import { EventDetailPage } from "@/pages/EventDetailPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { PaymentPage } from "@/pages/PaymentPage";
 import { PaymentSuccessPage } from "@/pages/PaymentSuccessPage";
+import { UserLoginPage } from "@/pages/UserLoginPage";
+import { UserRegisterPage } from "@/pages/UserRegisterPage";
+import { BibsPage } from "@/pages/account/BibsPage";
+import { ProfilePage } from "@/pages/account/ProfilePage";
 
 import { AdminLoginPage } from "@/pages/admin/LoginPage";
 import { AdminDashboardPage } from "@/pages/admin/DashboardPage";
 import { AdminEventsPage } from "@/pages/admin/EventsPage";
 import { AdminRegistrationsPage } from "@/pages/admin/RegistrationsPage";
 import { AdminAccountsPage } from "@/pages/admin/AccountsPage";
+
+function RequireUser({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useUser();
+  const location = useLocation();
+  if (isLoading) return null;
+  if (!user) return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
+  return <>{children}</>;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +47,10 @@ function PublicLayout() {
           <Route path="/events/:slug/register" element={<RegisterPage />} />
           <Route path="/payment/:id" element={<PaymentPage />} />
           <Route path="/payment/:id/success" element={<PaymentSuccessPage />} />
+          <Route path="/login" element={<UserLoginPage />} />
+          <Route path="/register" element={<UserRegisterPage />} />
+          <Route path="/account/bibs" element={<RequireUser><BibsPage /></RequireUser>} />
+          <Route path="/account/profile" element={<RequireUser><ProfilePage /></RequireUser>} />
         </Routes>
       </div>
       <footer className="bg-white border-t py-4 text-center text-xs text-gray-400">
@@ -47,6 +65,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
+        <UserProvider>
           <Routes>
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin" element={<AdminLayout />}>
@@ -57,6 +76,7 @@ export default function App() {
             </Route>
             <Route path="/*" element={<PublicLayout />} />
           </Routes>
+        </UserProvider>
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

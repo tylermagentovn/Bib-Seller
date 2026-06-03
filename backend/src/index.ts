@@ -9,6 +9,7 @@ import eventsRouter from "./routes/events";
 import uploadsRouter from "./routes/uploads";
 import registrationsRouter from "./routes/registrations";
 import paymentsRouter from "./routes/payments";
+import usersRouter from "./routes/users";
 import { prisma } from "./lib/prisma";
 
 const app = express();
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "..", "public", "uploads")));
 
 app.use("/api/auth", authRouter);
+app.use("/api/users", usersRouter);
 app.use("/api/events", eventsRouter);
 app.use("/api/uploads", uploadsRouter);
 app.use("/api/registrations", registrationsRouter);

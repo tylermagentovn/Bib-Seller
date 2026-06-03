@@ -59,12 +59,34 @@ model Distance {
   @@index([eventId])
 }
 
+model User {
+  id                String         @id @default(cuid())
+  email             String         @unique
+  password          String
+  fullName          String?
+  phone             String?
+  gender            String?
+  dob               DateTime?
+  idNumber          String?
+  shirtSize         String?
+  bloodType         String?
+  medicalConditions String?
+  emergencyName     String?
+  emergencyPhone    String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  registrations     Registration[]
+}
+
 model Registration {
   id             String             @id @default(cuid())
   eventId        String
   distanceId     String
+  userId         String?
   fullName       String?
   phone          String?
+  gender         String?
   email          String?
   dob            DateTime?
   idNumber       String?
@@ -82,12 +104,14 @@ model Registration {
 
   event       Event        @relation(fields: [eventId], references: [id])
   distance    Distance     @relation(fields: [distanceId], references: [id])
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   payment     Payment?
   teamMembers TeamMember[]
 
   @@index([eventId])
   @@index([distanceId])
   @@index([email])
+  @@index([userId])
 }
 
 model TeamMember {
@@ -96,6 +120,7 @@ model TeamMember {
   memberIndex       Int
   fullName          String
   phone             String
+  gender            String?
   email             String?
   dob               DateTime?
   idNumber          String?
