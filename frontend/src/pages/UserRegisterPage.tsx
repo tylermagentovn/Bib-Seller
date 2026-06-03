@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
-import { Bib1sLogo } from "@/components/Bib1sLogo";
 
 const schema = z.object({
   fullName: z.string().min(2, "Họ tên ít nhất 2 ký tự").optional().or(z.literal("")),
@@ -48,9 +47,6 @@ export function UserRegisterPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-10">
-      <div className="mb-8">
-        <Link to="/"><Bib1sLogo /></Link>
-      </div>
       <div className="bg-white rounded-2xl shadow-sm border p-8 w-full max-w-sm">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Tạo tài khoản</h1>
         <p className="text-sm text-gray-500 mb-6">Đăng ký để tham gia các sự kiện chạy bộ</p>
