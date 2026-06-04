@@ -9,7 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 
 const SPIN_DURATION = 2500;
 
-type Step = "disclaimer" | "bib";
+type Step = "landing" | "disclaimer" | "bib";
 
 export function PaymentSuccessPage() {
   const { id } = useParams<{ id: string }>();
@@ -39,9 +39,14 @@ export function PaymentSuccessPage() {
     if (registration?.status === "PAID" && step === null) {
       const hasDisclaimer = !!registration.event.disclaimer;
       const alreadySigned = !!registration.disclaimerSignedAt;
-      setStep(hasDisclaimer && !alreadySigned ? "disclaimer" : "bib");
+      const skipLanding = searchParams.get("step") === "waiver";
+      if (skipLanding) {
+        setStep(hasDisclaimer && !alreadySigned ? "disclaimer" : "bib");
+      } else {
+        setStep("landing");
+      }
     }
-  }, [registration?.status, step]);
+  }, [registration?.status, step, searchParams]);
 
   useEffect(() => {
     if (registration?.bibNumber) {
@@ -135,10 +140,48 @@ export function PaymentSuccessPage() {
       </div>
       <div className="flex justify-between border-t pt-2">
         <span className="text-gray-500">Đã thanh toán</span>
-        <span className="font-bold text-green-600">{formatCurrency(registration.payment?.amount ?? 0)}</span>
+        <span className="font-bold text-green-600">
+          {registration.payment?.amount ? formatCurrency(registration.payment.amount) : "Miễn phí"}
+        </span>
       </div>
     </div>
   );
+
+  // Step 0: Landing — payment/registration confirmed
+  if (step === "landing") {
+    const isFreeEvent = !registration.payment || registration.payment.amount === 0;
+    const hasDisclaimer = !!registration.event.disclaimer;
+    const alreadySigned = !!registration.disclaimerSignedAt;
+    const nextStep: Step = hasDisclaimer && !alreadySigned ? "disclaimer" : "bib";
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-violet-50 py-10 px-4">
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isFreeEvent ? "Đăng ký thành công!" : "Thanh toán thành công!"}
+            </h1>
+            <p className="text-gray-500 mt-1">Cảm ơn bạn đã đăng ký tham gia</p>
+          </div>
+
+          {summaryCard}
+
+          {registration.email && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4 text-sm text-blue-700 text-center">
+              Email xác nhận đã được gửi đến <strong>{registration.email}</strong>
+            </div>
+          )}
+
+          <Button size="lg" className="w-full" onClick={() => setStep(nextStep)}>
+            Ký miễn trừ &amp; Quay số BIB →
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Step 1: Disclaimer signing
   if (step === "disclaimer") {

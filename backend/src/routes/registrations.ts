@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth";
 import { optionalUserAuth, UserRequest } from "../middleware/userAuth";
 import { appendRegistrationToSheet } from "../services/sheets";
-import { sendContinueEmail } from "../services/email";
+import { sendRegistrationSuccessEmail } from "../services/email";
 
 const router = Router();
 
@@ -161,6 +161,19 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
       teamMembers: true,
     },
   });
+
+  // Send success email for free registrations (fire-and-forget)
+  if (isFree && registration.email) {
+    const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
+    const continueUrl = `${frontend.replace(/\/$/, "")}/payment/${registration.id}/success?step=waiver`;
+    sendRegistrationSuccessEmail({
+      to: registration.email,
+      fullName: registration.fullName ?? null,
+      registrationId: registration.id,
+      eventName: registration.event.name,
+      continueUrl,
+    }).catch(console.error);
+  }
 
   // Sync to Google Sheet (fire-and-forget)
   appendRegistrationToSheet({
@@ -520,33 +533,6 @@ router.patch("/:id/status", requireAuth, async (req: AuthRequest, res: Response)
     include: { payment: true, distance: true, event: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
   });
   res.json(updated);
-});
-
-// Admin: send continue email (bulk)
-router.post("/admin/send-continue", requireAuth, async (req: AuthRequest, res: Response) => {
-  const { ids } = req.body as { ids?: string[] };
-  if (!ids || !Array.isArray(ids) || ids.length === 0) {
-    res.status(400).json({ error: "ids required" });
-    return;
-  }
-
-  const registrations = await prisma.registration.findMany({
-    where: { id: { in: ids } },
-    include: { event: { select: { name: true, createdById: true } } },
-  });
-
-  // EVENT_MANAGER can only send emails for their own events
-  const allowed = req.adminRole === "SUPER_ADMIN"
-    ? registrations
-    : registrations.filter((r) => r.event.createdById === req.adminId);
-
-  const targets = allowed.filter((r) => r.status === "PAID" && !r.disclaimerSignedAt && r.email);
-
-  await Promise.all(targets.map((r) =>
-    sendContinueEmail({ to: r.email, fullName: r.fullName, registrationId: r.id, eventName: r.event.name })
-  ));
-
-  res.json({ sent: targets.length });
 });
 
 export default router;

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { PayOS } from "@payos/node";
 import { prisma } from "../lib/prisma";
-import { sendConfirmationEmail } from "../services/email";
+import { sendConfirmationEmail, sendRegistrationSuccessEmail } from "../services/email";
 import { updateBibInSheet } from "../services/sheets";
 
 const payos = new PayOS({
@@ -130,6 +130,19 @@ router.post("/webhook/payos", async (req: Request, res: Response) => {
       }),
     ]);
 
+    const reg = payment.registration;
+    if (reg.email) {
+      const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
+      const continueUrl = `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`;
+      sendRegistrationSuccessEmail({
+        to: reg.email,
+        fullName: reg.fullName ?? null,
+        registrationId: reg.id,
+        eventName: reg.event.name,
+        continueUrl,
+      }).catch(console.error);
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error("PayOS webhook error:", err);
@@ -147,6 +160,7 @@ router.post("/dev-confirm/:registrationId", async (req: Request, res: Response) 
   const registrationId = req.params.registrationId as string;
   const payment = await prisma.payment.findUnique({
     where: { registrationId },
+    include: { registration: { include: { event: true } } },
   });
 
   if (!payment) {
@@ -169,6 +183,19 @@ router.post("/dev-confirm/:registrationId", async (req: Request, res: Response) 
       data: { status: "PAID" },
     }),
   ]);
+
+  const reg = payment.registration;
+  if (reg.email) {
+    const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
+    const continueUrl = `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`;
+    sendRegistrationSuccessEmail({
+      to: reg.email,
+      fullName: reg.fullName ?? null,
+      registrationId: reg.id,
+      eventName: reg.event.name,
+      continueUrl,
+    }).catch(console.error);
+  }
 
   res.json({ success: true });
 });

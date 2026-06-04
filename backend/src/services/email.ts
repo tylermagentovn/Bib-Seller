@@ -98,35 +98,47 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData) {
   });
 }
 
-interface ContinueEmailData {
+interface RegistrationSuccessEmailData {
   to: string;
-  fullName: string;
+  fullName: string | null;
   registrationId: string;
   eventName: string;
+  continueUrl: string;
 }
 
-export async function sendContinueEmail(data: ContinueEmailData) {
-  const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
-  const link = `${frontend.replace(/\/$/, "")}/payment/${data.registrationId}/success?code=00`;
-
+export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmailData) {
   const html = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
       <style>
-        body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:0}
-        .card{max-width:600px;margin:32px auto;background:#fff;padding:24px;border-radius:8px}
-        .btn{display:inline-block;padding:12px 18px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none}
+        body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 40px 32px; text-align: center; color: white; }
+        .header h1 { margin: 0; font-size: 26px; }
+        .header p { margin: 8px 0 0; opacity: 0.85; }
+        .body { padding: 32px; }
+        .btn { display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; }
+        .footer { background: #f9f9f9; padding: 20px 32px; text-align: center; color: #999; font-size: 13px; }
       </style>
     </head>
     <body>
-      <div class="card">
-        <h2>Cảm ơn đã đăng ký sự kiện: ${data.eventName}</h2>
-        <p>Xin chào <strong>${data.fullName}</strong>,</p>
-        <p>Bạn đã hoàn tất thanh toán. Vui lòng bấm nút bên dưới để tiếp tục ký miễn trừ trách nhiệm và quay BIB.</p>
-        <p style="text-align:center;margin:22px 0;"><a class="btn" href="${link}">Ký miễn trừ & Quay BIB</a></p>
-        <p style="color:#888;font-size:12px">Nếu nút không hoạt động, sao chép đường dẫn sau vào trình duyệt của bạn:<br/><a href="${link}">${link}</a></p>
+      <div class="container">
+        <div class="header">
+          <h1>Đăng ký thành công!</h1>
+          <p>${data.eventName}</p>
+        </div>
+        <div class="body">
+          <p>Xin chào <strong>${data.fullName ?? "Bạn"}</strong>,</p>
+          <p>Đăng ký của bạn đã được xác nhận. Tiếp theo, bạn cần <strong>ký bản miễn trừ trách nhiệm</strong> và <strong>quay số BIB</strong> để hoàn tất.</p>
+          <p>Mã đăng ký: <strong>#${data.registrationId.slice(-8).toUpperCase()}</strong></p>
+          <p style="text-align: center; margin: 28px 0;">
+            <a class="btn" href="${data.continueUrl}">Ký miễn trừ &amp; Quay số BIB →</a>
+          </p>
+          <p style="color: #888; font-size: 13px;">Nếu nút không hoạt động, sao chép đường dẫn sau vào trình duyệt:<br/><a href="${data.continueUrl}">${data.continueUrl}</a></p>
+        </div>
+        <div class="footer">Email này được gửi tự động từ hệ thống BIB Register. Vui lòng không trả lời email này.</div>
       </div>
     </body>
     </html>
@@ -135,7 +147,7 @@ export async function sendContinueEmail(data: ContinueEmailData) {
   await transporter.sendMail({
     from: process.env.EMAIL_FROM,
     to: data.to,
-    subject: `Tiếp tục ký miễn trừ - ${data.eventName}`,
+    subject: `Đăng ký thành công - ${data.eventName}`,
     html,
   });
 }

@@ -698,21 +698,6 @@ export function AdminRegistrationsPage() {
   const [changingStatusReg, setChangingStatusReg] = useState<Registration | null>(null);
   const [editingInfoReg, setEditingInfoReg] = useState<Registration | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  const sendContinueMutation = useMutation({
-    mutationFn: (ids: string[]) => api.post(`/registrations/admin/send-continue`, { ids }).then((r) => r.data),
-    onSuccess: () => {
-      setSelectedIds([]);
-      queryClient.invalidateQueries({ queryKey: ["admin-registrations"] });
-      alert("Đã gửi email đến những đăng ký phù hợp");
-    },
-    onError: (err) => {
-      console.error(err);
-      alert("Gửi email thất bại");
-    },
-  });
-
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -797,13 +782,6 @@ export function AdminRegistrationsPage() {
           <p className="text-gray-500 text-sm mt-1">{total} tổng cộng</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => {
-            if (selectedIds.length === 0) { alert('Chọn ít nhất một đăng ký'); return; }
-            if (!confirm(`Gửi email tiếp tục cho ${selectedIds.length} đăng ký?`)) return;
-            sendContinueMutation.mutate(selectedIds);
-          }} disabled={sendContinueMutation.isPending}>
-            Gửi mail đăng ký
-          </Button>
           <Button variant="outline" onClick={handleExport} disabled={exporting}>
           {exporting
             ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Đang xuất...</>
@@ -843,16 +821,6 @@ export function AdminRegistrationsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-gray-50">
-                <th className="p-4">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.length > 0 && selectedIds.length === registrations.length}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedIds(registrations.map((r) => r.id));
-                      else setSelectedIds([]);
-                    }}
-                  />
-                </th>
                 <th className="text-left p-4 font-medium text-gray-600">Họ tên</th>
                 <th className="text-left p-4 font-medium text-gray-600">Sự kiện / Cự ly</th>
                 <th className="text-left p-4 font-medium text-gray-600">Liên hệ</th>
@@ -875,16 +843,6 @@ export function AdminRegistrationsPage() {
                   className="hover:bg-gray-50 transition-colors cursor-pointer"
                   onClick={() => setDetailReg(reg)}
                 >
-                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(reg.id)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        setSelectedIds((prev) => e.target.checked ? [...prev, reg.id] : prev.filter((id) => id !== reg.id));
-                      }}
-                    />
-                  </td>
                   <td className="p-4">
                     <div className="font-medium text-gray-900">{reg.fullName}</div>
                     <div className="text-xs text-gray-400 mt-0.5">{formatDate(reg.dob)}</div>

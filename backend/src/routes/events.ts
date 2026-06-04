@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -93,11 +94,12 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
       ...eventData,
       eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
       imageUrl: eventData.imageUrl || null,
-        shirtSizeImageUrl: eventData.shirtSizeImageUrl || null,
-        raceKitImageUrl: eventData.raceKitImageUrl || null,
-        raceKitDescription: eventData.raceKitDescription || null,
+      shirtSizeImageUrl: eventData.shirtSizeImageUrl || null,
+      raceKitImageUrl: eventData.raceKitImageUrl || null,
+      raceKitDescription: eventData.raceKitDescription || null,
       disclaimer: eventData.disclaimer || null,
-      createdById: req.adminId,
+      fieldConfig: eventData.fieldConfig === null ? Prisma.DbNull : eventData.fieldConfig,
+      createdBy: { connect: { id: req.adminId! } },
       distances: {
         create: distances.map((d) => ({
           name: d.name,
@@ -158,6 +160,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
         raceKitImageUrl: eventData.raceKitImageUrl || null,
         raceKitDescription: eventData.raceKitDescription || null,
         disclaimer: eventData.disclaimer || null,
+        fieldConfig: eventData.fieldConfig === null ? Prisma.DbNull : eventData.fieldConfig,
       },
     });
 

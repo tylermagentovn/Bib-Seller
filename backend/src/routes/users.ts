@@ -149,7 +149,7 @@ router.post("/auth/google", async (req: Request, res: Response) => {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!r.ok) throw new Error("invalid token");
-    googleUser = await r.json();
+    googleUser = (await r.json()) as { sub?: string; email?: string; name?: string };
   } catch {
     res.status(401).json({ error: "Token Google không hợp lệ" });
     return;

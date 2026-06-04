@@ -64,17 +64,20 @@ type FormData = {
   teamMembers?: MemberFormData[];
 };
 
+const str = (msg: string) => z.string({ required_error: msg, invalid_type_error: msg });
+
 function buildMemberItemSchema(cfg: FieldConfig) {
   const fields: Record<string, z.ZodTypeAny> = {
-    fullName: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự"),
-    phone: z.string().min(9, "Số điện thoại không hợp lệ"),
+    fullName: str("Vui lòng nhập họ tên").min(2, "Họ tên phải có ít nhất 2 ký tự"),
+    phone: str("Vui lòng nhập số điện thoại").min(9, "Số điện thoại không hợp lệ"),
     email: z.string().email("Email không hợp lệ").optional().or(z.literal("")),
   };
   for (const def of MEMBER_FIELD_DEFS) {
     const visibility = vis(cfg, def.configKey);
     if (visibility === "required") {
+      const msg = def.errorMessage ?? `Vui lòng nhập ${def.label.toLowerCase()}`;
       const minLen = def.minLength ?? 1;
-      fields[def.key] = z.string().min(minLen, def.errorMessage ?? `${def.label} là bắt buộc`);
+      fields[def.key] = str(msg).min(minLen, msg);
     } else {
       fields[def.key] = z.string().optional();
     }
@@ -88,17 +91,17 @@ function buildSchema(cfg: FieldConfig, isRelay: boolean) {
   const memberItemSchema = buildMemberItemSchema(cfg);
 
   const base = {
-    distanceId: z.string().min(1, "Vui lòng chọn cự ly"),
+    distanceId: str("Vui lòng chọn cự ly").min(1, "Vui lòng chọn cự ly"),
     disclaimer: z.boolean().refine((v) => v, "Bạn phải đồng ý với điều khoản"),
   };
 
   if (isRelay) {
     return z.object({
       ...base,
-      fullName: z.string().min(2, "Họ tên đội trưởng phải có ít nhất 2 ký tự"),
-      phone: z.string().min(9, "Số điện thoại không hợp lệ"),
+      fullName: str("Vui lòng nhập họ tên đội trưởng").min(2, "Họ tên đội trưởng phải có ít nhất 2 ký tự"),
+      phone: str("Vui lòng nhập số điện thoại").min(9, "Số điện thoại không hợp lệ"),
       gender: z.string().optional(),
-      email: z.string().email("Email không hợp lệ"),
+      email: str("Vui lòng nhập email").email("Email không hợp lệ"),
       dob: z.string().optional(),
       idNumber: z.string().optional(),
       shirtSize: z.string().optional(),
@@ -113,39 +116,39 @@ function buildSchema(cfg: FieldConfig, isRelay: boolean) {
   return z.object({
     ...base,
     fullName: show("fullName")
-      ? req("fullName") ? z.string().min(2, "Họ tên phải có ít nhất 2 ký tự") : z.string().optional()
+      ? req("fullName") ? str("Vui lòng nhập họ tên").min(2, "Họ tên phải có ít nhất 2 ký tự") : z.string().optional()
       : z.string().optional(),
     phone: show("phone")
-      ? req("phone") ? z.string().min(9, "Số điện thoại không hợp lệ") : z.string().optional()
+      ? req("phone") ? str("Vui lòng nhập số điện thoại").min(9, "Số điện thoại không hợp lệ") : z.string().optional()
       : z.string().optional(),
     gender: show("gender")
-      ? req("gender") ? z.string().min(1, "Vui lòng chọn giới tính") : z.string().optional()
+      ? req("gender") ? str("Vui lòng chọn giới tính").min(1, "Vui lòng chọn giới tính") : z.string().optional()
       : z.string().optional(),
     email: show("email")
       ? req("email")
-        ? z.string().email("Email không hợp lệ")
+        ? str("Vui lòng nhập email").email("Email không hợp lệ")
         : z.string().email("Email không hợp lệ").optional().or(z.literal(""))
       : z.string().optional(),
     dob: show("dob")
-      ? req("dob") ? z.string().min(1, "Vui lòng nhập ngày sinh") : z.string().optional()
+      ? req("dob") ? str("Vui lòng nhập ngày sinh").min(1, "Vui lòng nhập ngày sinh") : z.string().optional()
       : z.string().optional(),
     idNumber: show("idNumber")
-      ? req("idNumber") ? z.string().min(1, "Vui lòng nhập số CCCD") : z.string().optional()
+      ? req("idNumber") ? str("Vui lòng nhập số CCCD").min(1, "Vui lòng nhập số CCCD") : z.string().optional()
       : z.string().optional(),
     shirtSize: show("shirtSize")
-      ? req("shirtSize") ? z.string().min(1, "Vui lòng chọn size áo") : z.string().optional()
+      ? req("shirtSize") ? str("Vui lòng chọn size áo").min(1, "Vui lòng chọn size áo") : z.string().optional()
       : z.string().optional(),
     bloodType: show("bloodType")
-      ? req("bloodType") ? z.string().min(1, "Vui lòng chọn nhóm máu") : z.string().optional()
+      ? req("bloodType") ? str("Vui lòng chọn nhóm máu").min(1, "Vui lòng chọn nhóm máu") : z.string().optional()
       : z.string().optional(),
     medicalConditions: show("medicalConditions")
-      ? req("medicalConditions") ? z.string().min(1, "Vui lòng nhập thông tin bệnh lý") : z.string().optional()
+      ? req("medicalConditions") ? str("Vui lòng nhập thông tin bệnh lý").min(1, "Vui lòng nhập thông tin bệnh lý") : z.string().optional()
       : z.string().optional(),
     emergencyName: show("emergencyName")
-      ? req("emergencyName") ? z.string().min(2, "Vui lòng nhập tên người liên hệ") : z.string().optional()
+      ? req("emergencyName") ? str("Vui lòng nhập tên người liên hệ khẩn cấp").min(2, "Vui lòng nhập tên người liên hệ khẩn cấp") : z.string().optional()
       : z.string().optional(),
     emergencyPhone: show("emergencyPhone")
-      ? req("emergencyPhone") ? z.string().min(9, "Số điện thoại không hợp lệ") : z.string().optional()
+      ? req("emergencyPhone") ? str("Vui lòng nhập số điện thoại liên hệ khẩn cấp").min(9, "Số điện thoại không hợp lệ") : z.string().optional()
       : z.string().optional(),
     teamMembers: z.array(memberItemSchema).optional(),
   });
