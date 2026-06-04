@@ -10,6 +10,13 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+interface TeamMemberEmailInfo {
+  memberIndex: number;
+  fullName: string;
+  phone?: string | null;
+  email?: string | null;
+}
+
 interface ConfirmationEmailData {
   to: string;
   fullName: string | null;
@@ -27,6 +34,7 @@ interface ConfirmationEmailData {
   medicalConditions?: string | null;
   emergencyName?: string | null;
   emergencyPhone?: string | null;
+  teamMembers?: TeamMemberEmailInfo[];
 }
 
 export async function sendConfirmationEmail(data: ConfirmationEmailData) {
@@ -84,6 +92,22 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData) {
             ${data.medicalConditions ? `<tr><td>Bệnh lý</td><td>${data.medicalConditions}</td></tr>` : ""}
             ${(data.emergencyName || data.emergencyPhone) ? `<tr><td>Liên hệ khẩn cấp</td><td>${[data.emergencyName, data.emergencyPhone].filter(Boolean).join(" — ")}</td></tr>` : ""}
           </table>
+          ${data.teamMembers && data.teamMembers.length > 0 ? `
+          <h3 style="margin: 28px 0 12px; color: #444; font-size: 15px; border-top: 1px solid #f0f0f0; padding-top: 20px;">Thành viên nhóm</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr style="background: #f5f3ff;">
+              <th style="padding: 8px 10px; text-align: left; color: #6366f1; font-weight: 600;">#</th>
+              <th style="padding: 8px 10px; text-align: left; color: #6366f1; font-weight: 600;">Họ tên</th>
+              <th style="padding: 8px 10px; text-align: left; color: #6366f1; font-weight: 600;">Liên hệ</th>
+            </tr>
+            ${data.teamMembers.map(m => `
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+              <td style="padding: 8px 10px; color: #888;">${m.memberIndex}</td>
+              <td style="padding: 8px 10px; font-weight: 600;">${m.fullName}</td>
+              <td style="padding: 8px 10px; color: #555;">${[m.phone, m.email].filter(Boolean).join(" / ") || "—"}</td>
+            </tr>`).join("")}
+          </table>
+          ` : ""}
           <p style="color:#666; font-size:14px;">Vui lòng mang theo email này hoặc số BIB vào ngày thi đấu. Chúc bạn thi đấu thật tốt!</p>
         </div>
         <div class="footer">
@@ -113,6 +137,7 @@ interface RegistrationSuccessEmailData {
   registrationId: string;
   eventName: string;
   continueUrl: string;
+  teamMembers?: TeamMemberEmailInfo[];
 }
 
 export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmailData) {
@@ -146,6 +171,22 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
           <p>Xin chào <strong>${data.fullName ?? "Bạn"}</strong>,</p>
           <p>Đăng ký của bạn đã được xác nhận. Tiếp theo, bạn cần <strong>ký bản miễn trừ trách nhiệm</strong> và <strong>quay số BIB</strong> để hoàn tất.</p>
           <p>Mã đăng ký: <strong>#${data.registrationId.slice(-8).toUpperCase()}</strong></p>
+          ${data.teamMembers && data.teamMembers.length > 0 ? `
+          <h3 style="margin: 24px 0 12px; color: #444; font-size: 15px; border-top: 1px solid #f0f0f0; padding-top: 20px;">Thành viên nhóm</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr style="background: #f5f3ff;">
+              <th style="padding: 8px 10px; text-align: left; color: #6366f1; font-weight: 600;">#</th>
+              <th style="padding: 8px 10px; text-align: left; color: #6366f1; font-weight: 600;">Họ tên</th>
+              <th style="padding: 8px 10px; text-align: left; color: #6366f1; font-weight: 600;">Liên hệ</th>
+            </tr>
+            ${data.teamMembers.map(m => `
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+              <td style="padding: 8px 10px; color: #888;">${m.memberIndex}</td>
+              <td style="padding: 8px 10px; font-weight: 600;">${m.fullName}</td>
+              <td style="padding: 8px 10px; color: #555;">${[m.phone, m.email].filter(Boolean).join(" / ") || "—"}</td>
+            </tr>`).join("")}
+          </table>
+          ` : ""}
           <p style="text-align: center; margin: 28px 0;">
             <a class="btn" href="${data.continueUrl}">Ký miễn trừ &amp; Quay số BIB →</a>
           </p>

@@ -103,6 +103,7 @@ export interface Distance {
   bibEnd: number;
   type: "SOLO" | "RELAY";
   teamSize: number | null;
+  memberFieldConfig: FieldConfig | null;
   _count?: { registrations: number };
 }
 

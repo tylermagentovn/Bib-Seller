@@ -111,7 +111,7 @@ router.post("/webhook/payos", async (req: Request, res: Response) => {
 
     const payment = await prisma.payment.findFirst({
       where: { payosOrderCode: orderCode, status: "PENDING" },
-      include: { registration: { include: { event: true, distance: true } } },
+      include: { registration: { include: { event: true, distance: true, teamMembers: { orderBy: { memberIndex: "asc" } } } } },
     });
 
     if (!payment) {
@@ -140,6 +140,7 @@ router.post("/webhook/payos", async (req: Request, res: Response) => {
         registrationId: reg.id,
         eventName: reg.event.name,
         continueUrl,
+        teamMembers: reg.teamMembers.length > 0 ? reg.teamMembers : undefined,
       }).catch(console.error);
     }
 
@@ -160,7 +161,7 @@ router.post("/dev-confirm/:registrationId", async (req: Request, res: Response) 
   const registrationId = req.params.registrationId as string;
   const payment = await prisma.payment.findUnique({
     where: { registrationId },
-    include: { registration: { include: { event: true } } },
+    include: { registration: { include: { event: true, teamMembers: { orderBy: { memberIndex: "asc" } } } } },
   });
 
   if (!payment) {
@@ -194,6 +195,7 @@ router.post("/dev-confirm/:registrationId", async (req: Request, res: Response) 
       registrationId: reg.id,
       eventName: reg.event.name,
       continueUrl,
+      teamMembers: reg.teamMembers.length > 0 ? reg.teamMembers : undefined,
     }).catch(console.error);
   }
 
@@ -250,7 +252,7 @@ router.post("/bib/confirm/:registrationId", async (req: Request, res: Response) 
 
   const registration = await prisma.registration.findUnique({
     where: { id: registrationId },
-    include: { distance: true, event: true, payment: true },
+    include: { distance: true, event: true, payment: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
   });
 
   if (!registration || registration.status !== "PAID") {
@@ -304,6 +306,7 @@ router.post("/bib/confirm/:registrationId", async (req: Request, res: Response) 
       medicalConditions: registration.medicalConditions ?? null,
       emergencyName: registration.emergencyName ?? null,
       emergencyPhone: registration.emergencyPhone ?? null,
+      teamMembers: registration.teamMembers.length > 0 ? registration.teamMembers : undefined,
     }).catch(console.error);
   }
 

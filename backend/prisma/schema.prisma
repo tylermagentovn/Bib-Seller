@@ -51,8 +51,9 @@ model Distance {
   maxSlots Int
   bibStart Int
   bibEnd   Int
-  type     DistanceType @default(SOLO)
-  teamSize Int?
+  type              DistanceType @default(SOLO)
+  teamSize          Int?
+  memberFieldConfig Json?
 
   event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
   registrations Registration[]

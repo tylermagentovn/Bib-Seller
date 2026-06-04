@@ -50,6 +50,8 @@ router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) =>
   res.json(events);
 });
 
+const fieldVisibilitySchema = z.enum(["required", "optional", "hidden"]);
+
 const distanceSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
@@ -59,9 +61,8 @@ const distanceSchema = z.object({
   bibEnd: z.number().int().positive(),
   type: z.enum(["SOLO", "RELAY"]).default("SOLO"),
   teamSize: z.number().int().min(2).optional().nullable(),
+  memberFieldConfig: z.record(z.string(), fieldVisibilitySchema).optional().nullable(),
 });
-
-const fieldVisibilitySchema = z.enum(["required", "optional", "hidden"]);
 
 const eventSchema = z.object({
   name: z.string().min(1),
@@ -109,6 +110,9 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
           bibEnd: d.bibEnd,
           type: d.type,
           teamSize: d.type === "RELAY" ? (d.teamSize ?? null) : null,
+          memberFieldConfig: d.type === "RELAY"
+            ? (d.memberFieldConfig === null ? Prisma.DbNull : (d.memberFieldConfig ?? undefined))
+            : Prisma.DbNull,
         })),
       },
     },
@@ -169,6 +173,9 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     }
 
     for (const d of distances) {
+      const memberFieldConfig = d.type === "RELAY"
+        ? (d.memberFieldConfig === null ? Prisma.DbNull : (d.memberFieldConfig ?? undefined))
+        : Prisma.DbNull;
       if (d.id) {
         await tx.distance.update({
           where: { id: d.id },
@@ -180,6 +187,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
             bibEnd: d.bibEnd,
             type: d.type,
             teamSize: d.type === "RELAY" ? (d.teamSize ?? null) : null,
+            memberFieldConfig,
           },
         });
       } else {
@@ -193,6 +201,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
             bibEnd: d.bibEnd,
             type: d.type,
             teamSize: d.type === "RELAY" ? (d.teamSize ?? null) : null,
+            memberFieldConfig,
           },
         });
       }

@@ -64,16 +64,26 @@ type FormData = {
   teamMembers?: MemberFormData[];
 };
 
-const str = (msg: string) => z.string({ required_error: msg, invalid_type_error: msg });
+const str = (msg: string) => z.string({ error: msg });
 
-function buildMemberItemSchema(cfg: FieldConfig) {
+function buildMemberItemSchema(memberCfg: FieldConfig) {
+  const phoneVis = vis(memberCfg, "phone");
+  const emailVis = vis(memberCfg, "email");
   const fields: Record<string, z.ZodTypeAny> = {
     fullName: str("Vui lòng nhập họ tên").min(2, "Họ tên phải có ít nhất 2 ký tự"),
-    phone: str("Vui lòng nhập số điện thoại").min(9, "Số điện thoại không hợp lệ"),
-    email: z.string().email("Email không hợp lệ").optional().or(z.literal("")),
+    phone: phoneVis === "hidden"
+      ? z.string().optional()
+      : phoneVis === "required"
+        ? str("Vui lòng nhập số điện thoại").min(9, "Số điện thoại không hợp lệ")
+        : z.string().optional(),
+    email: emailVis === "hidden"
+      ? z.string().optional()
+      : emailVis === "required"
+        ? str("Vui lòng nhập email").email("Email không hợp lệ")
+        : z.string().email("Email không hợp lệ").optional().or(z.literal("")),
   };
   for (const def of MEMBER_FIELD_DEFS) {
-    const visibility = vis(cfg, def.configKey);
+    const visibility = vis(memberCfg, def.configKey);
     if (visibility === "required") {
       const msg = def.errorMessage ?? `Vui lòng nhập ${def.label.toLowerCase()}`;
       const minLen = def.minLength ?? 1;
@@ -85,36 +95,17 @@ function buildMemberItemSchema(cfg: FieldConfig) {
   return z.object(fields);
 }
 
-function buildSchema(cfg: FieldConfig, isRelay: boolean) {
+function buildSchema(cfg: FieldConfig, isRelay: boolean, memberCfg: FieldConfig) {
   const req = (key: keyof FieldConfig) => vis(cfg, key) === "required";
   const show = (key: keyof FieldConfig) => vis(cfg, key) !== "hidden";
-  const memberItemSchema = buildMemberItemSchema(cfg);
+  const memberItemSchema = buildMemberItemSchema(memberCfg);
 
   const base = {
     distanceId: str("Vui lòng chọn cự ly").min(1, "Vui lòng chọn cự ly"),
     disclaimer: z.boolean().refine((v) => v, "Bạn phải đồng ý với điều khoản"),
   };
 
-  if (isRelay) {
-    return z.object({
-      ...base,
-      fullName: str("Vui lòng nhập họ tên đội trưởng").min(2, "Họ tên đội trưởng phải có ít nhất 2 ký tự"),
-      phone: str("Vui lòng nhập số điện thoại").min(9, "Số điện thoại không hợp lệ"),
-      gender: z.string().optional(),
-      email: str("Vui lòng nhập email").email("Email không hợp lệ"),
-      dob: z.string().optional(),
-      idNumber: z.string().optional(),
-      shirtSize: z.string().optional(),
-      bloodType: z.string().optional(),
-      medicalConditions: z.string().optional(),
-      emergencyName: z.string().optional(),
-      emergencyPhone: z.string().optional(),
-      teamMembers: z.array(memberItemSchema),
-    });
-  }
-
-  return z.object({
-    ...base,
+  const registrantFields = {
     fullName: show("fullName")
       ? req("fullName") ? str("Vui lòng nhập họ tên").min(2, "Họ tên phải có ít nhất 2 ký tự") : z.string().optional()
       : z.string().optional(),
@@ -150,7 +141,12 @@ function buildSchema(cfg: FieldConfig, isRelay: boolean) {
     emergencyPhone: show("emergencyPhone")
       ? req("emergencyPhone") ? str("Vui lòng nhập số điện thoại liên hệ khẩn cấp").min(9, "Số điện thoại không hợp lệ") : z.string().optional()
       : z.string().optional(),
-    teamMembers: z.array(memberItemSchema).optional(),
+  };
+
+  return z.object({
+    ...base,
+    ...registrantFields,
+    teamMembers: isRelay ? z.array(memberItemSchema) : z.array(memberItemSchema).optional(),
   });
 }
 
@@ -252,11 +248,12 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
 
   const isRelayRef = useRef(false);
   const cfgRef = useRef(cfg);
+  const memberCfgRef = useRef<FieldConfig>({});
   cfgRef.current = cfg;
 
   const resolver = useCallback(
     ((data: any, ctx: any, opts: any) =>
-      zodResolver(buildSchema(cfgRef.current, isRelayRef.current))(data, ctx, opts)) as any,
+      zodResolver(buildSchema(cfgRef.current, isRelayRef.current, memberCfgRef.current))(data, ctx, opts)) as any,
     []
   );
 
@@ -297,8 +294,15 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
   const isRelay = selectedDistance?.type === "RELAY";
   const isFlexibleRelay = isRelay && selectedDistance?.teamSize == null;
 
-  // Keep ref in sync with current render
+  // Keep refs in sync with current render
   isRelayRef.current = isRelay;
+  const memberCfg = (selectedDistance?.memberFieldConfig as FieldConfig) ?? {};
+  const memberShow = (key: keyof FieldConfig) => vis(memberCfg, key) !== "hidden";
+  const memberIsReq = (key: keyof FieldConfig) => vis(memberCfg, key) === "required";
+  const memberFieldLabel = (key: keyof FieldConfig, defaultLabel: string) => (
+    <>{defaultLabel}{memberIsReq(key) && <span className="text-red-500"> *</span>}</>
+  );
+  memberCfgRef.current = memberCfg;
 
   useEffect(() => {
     if (!selectedDistance) return;
@@ -366,7 +370,7 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
                         {d.name}
                         {d.type === "RELAY" && (
                           <span className="ml-1 text-xs text-indigo-500">
-                            {d.teamSize == null ? "(Relay tùy chọn)" : `(Relay ${d.teamSize} người)`}
+                            {d.teamSize == null ? "(Nhóm tùy chọn)" : `(Nhóm ${d.teamSize} người)`}
                           </span>
                         )}
                         {" "}— {formatCurrency(d.price)}
@@ -379,146 +383,119 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
               {errors.distanceId && <p className="text-xs text-red-500">{errors.distanceId.message}</p>}
             </div>
 
-            {/* ── RELAY: leader info (always name/phone/email only) ── */}
-            {isRelay && (
-              <>
-                <div className="space-y-1.5">
-                  <Label>Họ và tên đội trưởng <span className="text-red-500">*</span></Label>
-                  <Input placeholder="Nguyễn Văn A" {...register("fullName")} />
-                  {errors.fullName && <p className="text-xs text-red-500">{errors.fullName.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Số điện thoại <span className="text-red-500">*</span></Label>
-                  <Input placeholder="0901234567" type="tel" {...register("phone")} />
-                  {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Email <span className="text-red-500">*</span></Label>
-                  <Input placeholder="email@example.com" type="email" {...register("email")} />
-                  {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
-                </div>
-              </>
+            {/* ── Registrant / team-leader fields — driven by event fieldConfig ── */}
+            {show("fullName") && (
+              <div className="space-y-1.5">
+                <Label>
+                  {isRelay
+                    ? <>Họ và tên đội trưởng{isReq("fullName") && <span className="text-red-500"> *</span>}</>
+                    : fieldLabel("fullName", "Họ và tên")}
+                </Label>
+                <Input placeholder="Nguyễn Văn A" {...register("fullName")} />
+                {errors.fullName && <p className="text-xs text-red-500">{errors.fullName.message}</p>}
+              </div>
             )}
-
-            {/* ── SOLO: all fields controlled by fieldConfig ── */}
-            {!isRelay && (
-              <>
-                {show("fullName") && (
-                  <div className="space-y-1.5">
-                    <Label>{fieldLabel("fullName", "Họ và tên")}</Label>
-                    <Input placeholder="Nguyễn Văn A" {...register("fullName")} />
-                    {errors.fullName && <p className="text-xs text-red-500">{errors.fullName.message}</p>}
-                  </div>
-                )}
-                {show("phone") && (
-                  <div className="space-y-1.5">
-                    <Label>{fieldLabel("phone", "Số điện thoại")}</Label>
-                    <Input placeholder="0901234567" type="tel" {...register("phone")} />
-                    {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
-                  </div>
-                )}
-                {show("email") && (
-                  <div className="space-y-1.5">
-                    <Label>{fieldLabel("email", "Email")}</Label>
-                    <Input placeholder="email@example.com" type="email" {...register("email")} />
-                    {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
-                  </div>
-                )}
-                {show("gender") && (
-                  <div className="space-y-1.5">
-                    <Label>{fieldLabel("gender", "Giới tính")}</Label>
-                    <Select value={watch("gender") ?? ""} onValueChange={(v) => setValue("gender", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn giới tính" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {GENDERS.map((g) => (
-                          <SelectItem key={g} value={g}>{g}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.gender && <p className="text-xs text-red-500">{errors.gender.message}</p>}
-                  </div>
-                )}
-                {show("dob") && (
-                  <div className="space-y-1.5">
-                    <Label>{fieldLabel("dob", "Ngày sinh")}</Label>
-                    <Input type="date" {...register("dob")} />
-                    {errors.dob && <p className="text-xs text-red-500">{errors.dob.message}</p>}
-                  </div>
-                )}
-                {show("idNumber") && (
-                  <div className="space-y-1.5">
-                    <Label>{fieldLabel("idNumber", "Số CCCD")}</Label>
-                    <Input placeholder="012345678901" {...register("idNumber")} />
-                    {errors.idNumber && <p className="text-xs text-red-500">{errors.idNumber.message}</p>}
-                  </div>
-                )}
-                {show("shirtSize") && (
-                  <div className="space-y-1.5">
-                    <Label>{fieldLabel("shirtSize", "Size áo")}</Label>
-                    <Select value={watch("shirtSize") ?? ""} onValueChange={(v) => setValue("shirtSize", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn size áo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SHIRT_SIZES.map((s) => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.shirtSize && <p className="text-xs text-red-500">{errors.shirtSize.message}</p>}
-                  </div>
-                )}
-                {show("bloodType") && (
-                  <div className="space-y-1.5">
-                    <Label>{fieldLabel("bloodType", "Nhóm máu")}</Label>
-                    <Select value={watch("bloodType") ?? ""} onValueChange={(v) => setValue("bloodType", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn nhóm máu" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {BLOOD_TYPES.map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.bloodType && <p className="text-xs text-red-500">{errors.bloodType.message}</p>}
-                  </div>
-                )}
-                {show("medicalConditions") && (
-                  <div className="space-y-1.5">
-                    <Label>{fieldLabel("medicalConditions", "Bệnh lý")}</Label>
-                    <textarea
-                      className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[70px] resize-none"
-                      placeholder="Các bệnh lý hoặc tình trạng sức khỏe cần lưu ý (nếu có)"
-                      {...register("medicalConditions")}
-                    />
-                    {errors.medicalConditions && <p className="text-xs text-red-500">{errors.medicalConditions.message}</p>}
-                  </div>
-                )}
-                {(show("emergencyName") || show("emergencyPhone")) && (
-                  <div className="border-t pt-5">
-                    <p className="text-sm font-medium text-gray-700 mb-4">Người liên hệ khẩn cấp</p>
-                    <div className="space-y-4">
-                      {show("emergencyName") && (
-                        <div className="space-y-1.5">
-                          <Label>{fieldLabel("emergencyName", "Họ tên")}</Label>
-                          <Input placeholder="Nguyễn Thị B" {...register("emergencyName")} />
-                          {errors.emergencyName && <p className="text-xs text-red-500">{errors.emergencyName.message}</p>}
-                        </div>
-                      )}
-                      {show("emergencyPhone") && (
-                        <div className="space-y-1.5">
-                          <Label>{fieldLabel("emergencyPhone", "Số điện thoại")}</Label>
-                          <Input placeholder="0901234567" type="tel" {...register("emergencyPhone")} />
-                          {errors.emergencyPhone && <p className="text-xs text-red-500">{errors.emergencyPhone.message}</p>}
-                        </div>
-                      )}
+            {show("phone") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("phone", "Số điện thoại")}</Label>
+                <Input placeholder="0901234567" type="tel" {...register("phone")} />
+                {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
+              </div>
+            )}
+            {show("email") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("email", "Email")}</Label>
+                <Input placeholder="email@example.com" type="email" {...register("email")} />
+                {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+              </div>
+            )}
+            {show("gender") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("gender", "Giới tính")}</Label>
+                <Select value={watch("gender") ?? ""} onValueChange={(v) => setValue("gender", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn giới tính" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GENDERS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {errors.gender && <p className="text-xs text-red-500">{errors.gender.message}</p>}
+              </div>
+            )}
+            {show("dob") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("dob", "Ngày sinh")}</Label>
+                <Input type="date" {...register("dob")} />
+                {errors.dob && <p className="text-xs text-red-500">{errors.dob.message}</p>}
+              </div>
+            )}
+            {show("idNumber") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("idNumber", "Số CCCD")}</Label>
+                <Input placeholder="012345678901" {...register("idNumber")} />
+                {errors.idNumber && <p className="text-xs text-red-500">{errors.idNumber.message}</p>}
+              </div>
+            )}
+            {show("shirtSize") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("shirtSize", "Size áo")}</Label>
+                <Select value={watch("shirtSize") ?? ""} onValueChange={(v) => setValue("shirtSize", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn size áo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SHIRT_SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {errors.shirtSize && <p className="text-xs text-red-500">{errors.shirtSize.message}</p>}
+              </div>
+            )}
+            {show("bloodType") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("bloodType", "Nhóm máu")}</Label>
+                <Select value={watch("bloodType") ?? ""} onValueChange={(v) => setValue("bloodType", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn nhóm máu" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BLOOD_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {errors.bloodType && <p className="text-xs text-red-500">{errors.bloodType.message}</p>}
+              </div>
+            )}
+            {show("medicalConditions") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("medicalConditions", "Bệnh lý")}</Label>
+                <textarea
+                  className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[70px] resize-none"
+                  placeholder="Các bệnh lý hoặc tình trạng sức khỏe cần lưu ý (nếu có)"
+                  {...register("medicalConditions")}
+                />
+                {errors.medicalConditions && <p className="text-xs text-red-500">{errors.medicalConditions.message}</p>}
+              </div>
+            )}
+            {(show("emergencyName") || show("emergencyPhone")) && (
+              <div className="border-t pt-5">
+                <p className="text-sm font-medium text-gray-700 mb-4">Người liên hệ khẩn cấp</p>
+                <div className="space-y-4">
+                  {show("emergencyName") && (
+                    <div className="space-y-1.5">
+                      <Label>{fieldLabel("emergencyName", "Họ tên")}</Label>
+                      <Input placeholder="Nguyễn Thị B" {...register("emergencyName")} />
+                      {errors.emergencyName && <p className="text-xs text-red-500">{errors.emergencyName.message}</p>}
                     </div>
-                  </div>
-                )}
-              </>
+                  )}
+                  {show("emergencyPhone") && (
+                    <div className="space-y-1.5">
+                      <Label>{fieldLabel("emergencyPhone", "Số điện thoại")}</Label>
+                      <Input placeholder="0901234567" type="tel" {...register("emergencyPhone")} />
+                      {errors.emergencyPhone && <p className="text-xs text-red-500">{errors.emergencyPhone.message}</p>}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
 
             {/* ── Team members (RELAY only) ── */}
@@ -571,18 +548,20 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
                             <p className="text-xs text-red-500">{errors.teamMembers[i].fullName?.message}</p>
                           )}
                         </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-sm">Số điện thoại <span className="text-red-500">*</span></Label>
-                          <Input placeholder="0901234567" type="tel" {...register(`teamMembers.${i}.phone`)} />
-                          {errors.teamMembers?.[i]?.phone && (
-                            <p className="text-xs text-red-500">{errors.teamMembers[i].phone?.message}</p>
-                          )}
-                        </div>
-
-                        {/* fieldConfig-driven fields */}
-                        {show("email") && (
+                        {memberShow("phone") && (
                           <div className="space-y-1.5">
-                            <Label className="text-sm">{fieldLabel("email", "Email")}</Label>
+                            <Label className="text-sm">{memberFieldLabel("phone", "Số điện thoại")}</Label>
+                            <Input placeholder="0901234567" type="tel" {...register(`teamMembers.${i}.phone`)} />
+                            {errors.teamMembers?.[i]?.phone && (
+                              <p className="text-xs text-red-500">{errors.teamMembers[i].phone?.message}</p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* memberFieldConfig-driven fields */}
+                        {memberShow("email") && (
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">{memberFieldLabel("email", "Email")}</Label>
                             <Input placeholder="email@example.com" type="email" {...register(`teamMembers.${i}.email`)} />
                             {errors.teamMembers?.[i]?.email && (
                               <p className="text-xs text-red-500">{errors.teamMembers[i].email?.message}</p>
@@ -598,8 +577,8 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
                             watch={watch}
                             setValue={setValue}
                             errors={errors}
-                            show={show}
-                            fieldLabel={fieldLabel}
+                            show={memberShow}
+                            fieldLabel={memberFieldLabel}
                           />
                         ))}
                       </div>
@@ -630,7 +609,7 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
                 <div className="flex justify-between text-sm mb-4 bg-indigo-50 rounded-xl p-3">
                   <span className="text-gray-600">
                     Phí đăng ký ({selectedDistance.name}
-                    {isRelay && ` — Relay ${isFlexibleRelay ? `${memberFields.length} người` : `${selectedDistance.teamSize} người`}`})
+                    {isRelay && ` — Nhóm ${isFlexibleRelay ? `${memberFields.length} người` : `${selectedDistance.teamSize} người`}`})
                   </span>
                   <span className="font-bold text-indigo-600">{formatCurrency(selectedDistance.price)}</span>
                 </div>

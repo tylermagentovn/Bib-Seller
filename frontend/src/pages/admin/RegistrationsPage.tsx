@@ -127,6 +127,10 @@ function EditInfoModal({ reg, onClose }: {
   const [emergencyName, setEmergencyName] = useState(reg.emergencyName ?? "");
   const [emergencyPhone, setEmergencyPhone] = useState(reg.emergencyPhone ?? "");
   const isRelay = reg.distance.type === "RELAY";
+  const fieldConfig = reg.event.fieldConfig;
+  const memberFieldConfig = reg.distance.memberFieldConfig;
+  const fv = (key: string) => !fieldConfig || (fieldConfig as Record<string, string | undefined>)[key] !== "hidden";
+  const mv = (key: string) => !memberFieldConfig || (memberFieldConfig as Record<string, string | undefined>)[key] !== "hidden";
 
   const [teamMembers, setTeamMembers] = useState<MemberEditState[]>(
     reg.teamMembers.map((m) => ({
@@ -152,22 +156,24 @@ function EditInfoModal({ reg, onClose }: {
   });
 
   const handleSubmit = () => {
-    const payload: Record<string, unknown> = { fullName, phone, email };
-    if (!isRelay) {
-      payload.gender = gender === "_none_" ? null : gender || null;
-      payload.dob = dob;
-      payload.idNumber = idNumber || null;
-      payload.shirtSize = shirtSize === "_none_" ? null : shirtSize || null;
-      payload.bloodType = bloodType === "_none_" ? null : bloodType || null;
-      payload.medicalConditions = medicalConditions || null;
-      payload.emergencyName = emergencyName || null;
-      payload.emergencyPhone = emergencyPhone || null;
-    }
-    if (isRelay) {
+    const payload: Record<string, unknown> = {
+      fullName,
+      phone,
+      email,
+      gender: gender === "_none_" ? null : gender || null,
+      dob: dob || null,
+      idNumber: idNumber || null,
+      shirtSize: shirtSize === "_none_" ? null : shirtSize || null,
+      bloodType: bloodType === "_none_" ? null : bloodType || null,
+      medicalConditions: medicalConditions || null,
+      emergencyName: emergencyName || null,
+      emergencyPhone: emergencyPhone || null,
+    };
+    if (teamMembers.length > 0) {
       payload.teamMembers = teamMembers.map((m) => ({
         fullName: m.fullName,
-        phone: m.phone,
-        email: m.email || null,
+        phone: m.phone || "",
+        email: m.email || "",
         ...Object.fromEntries(
           MEMBER_FIELD_DEFS.map((f) => [f.key, normalizeFieldValue(f, m[f.key] ?? f.defaultValue)])
         ),
@@ -204,40 +210,31 @@ function EditInfoModal({ reg, onClose }: {
               <label className="text-sm font-medium text-gray-700 mb-1 block">Họ tên</label>
               <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
             </div>
-            {isRelay ? (
-              <>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">Ngày sinh</label>
-                  <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </div>
-              </>
+            {fv("dob") && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Ngày sinh</label>
+                <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+              </div>
+            )}
+            {fv("phone") && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
+                <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+            )}
+            {fv("email") && (
+              <div className="col-span-2">
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
             )}
           </div>
 
-          {!isRelay && (
-            <>
-              <div className="border-t pt-4">
-                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Thông tin bổ sung</h4>
-                <div className="grid grid-cols-2 gap-3">
+          {(fv("gender") || fv("idNumber") || fv("shirtSize") || fv("bloodType") || fv("medicalConditions")) && (
+            <div className="border-t pt-4">
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Thông tin bổ sung</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {fv("gender") && (
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Giới tính</label>
                     <Select value={gender} onValueChange={setGender}>
@@ -248,10 +245,14 @@ function EditInfoModal({ reg, onClose }: {
                       </SelectContent>
                     </Select>
                   </div>
+                )}
+                {fv("idNumber") && (
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Số CCCD</label>
                     <Input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Nhập số CCCD" />
                   </div>
+                )}
+                {fv("shirtSize") && (
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Size áo</label>
                     <Select value={shirtSize} onValueChange={setShirtSize}>
@@ -262,6 +263,8 @@ function EditInfoModal({ reg, onClose }: {
                       </SelectContent>
                     </Select>
                   </div>
+                )}
+                {fv("bloodType") && (
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Nhóm máu</label>
                     <Select value={bloodType} onValueChange={setBloodType}>
@@ -272,6 +275,8 @@ function EditInfoModal({ reg, onClose }: {
                       </SelectContent>
                     </Select>
                   </div>
+                )}
+                {fv("medicalConditions") && (
                   <div className="col-span-2">
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Bệnh lý</label>
                     <textarea
@@ -281,26 +286,32 @@ function EditInfoModal({ reg, onClose }: {
                       placeholder="Ghi chú bệnh lý..."
                     />
                   </div>
-                </div>
+                )}
               </div>
+            </div>
+          )}
 
-              <div className="border-t pt-4">
-                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Liên hệ khẩn cấp</h4>
-                <div className="grid grid-cols-2 gap-3">
+          {(fv("emergencyName") || fv("emergencyPhone")) && (
+            <div className="border-t pt-4">
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Liên hệ khẩn cấp</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {fv("emergencyName") && (
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Họ tên</label>
                     <Input value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} />
                   </div>
+                )}
+                {fv("emergencyPhone") && (
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Điện thoại</label>
                     <Input value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
                   </div>
-                </div>
+                )}
               </div>
-            </>
+            </div>
           )}
 
-          {isRelay && teamMembers.length > 0 && (
+          {teamMembers.length > 0 && (
             <div className="border-t pt-4">
               <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
                 Thành viên nhóm
@@ -314,15 +325,19 @@ function EditInfoModal({ reg, onClose }: {
                         <label className="text-xs text-gray-500 mb-1 block">Họ tên</label>
                         <Input className="h-8 text-sm" value={m.fullName} onChange={(e) => updateMember(i, "fullName", e.target.value)} />
                       </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Điện thoại</label>
-                        <Input className="h-8 text-sm" value={m.phone} onChange={(e) => updateMember(i, "phone", e.target.value)} />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Email</label>
-                        <Input className="h-8 text-sm" type="email" value={m.email} onChange={(e) => updateMember(i, "email", e.target.value)} />
-                      </div>
-                      {MEMBER_FIELD_DEFS.map((def) => (
+                      {mv("phone") && (
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Điện thoại</label>
+                          <Input className="h-8 text-sm" value={m.phone} onChange={(e) => updateMember(i, "phone", e.target.value)} />
+                        </div>
+                      )}
+                      {mv("email") && (
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Email</label>
+                          <Input className="h-8 text-sm" type="email" value={m.email} onChange={(e) => updateMember(i, "email", e.target.value)} />
+                        </div>
+                      )}
+                      {MEMBER_FIELD_DEFS.filter((def) => mv(def.configKey)).map((def) => (
                         <div key={def.key} className={def.type === "textarea" ? "col-span-2" : ""}>
                           <label className="text-xs text-gray-500 mb-1 block">{def.label}</label>
                           {renderMemberField(def, m[def.key] ?? def.defaultValue, (v) => updateMember(i, def.key, v))}
@@ -548,12 +563,12 @@ function DetailModal({ reg, onClose, onEditBib, onEditStatus, onEditInfo }: {
                     </div>
                     <div className="space-y-1 text-xs text-gray-500 pl-7">
                       <div className="flex gap-4">
-                        <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{m.phone}</span>
+                        {m.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{m.phone}</span>}
                         {m.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{m.email}</span>}
                       </div>
                       {MEMBER_FIELD_DEFS.map((def) => {
                         const val = m[def.key as keyof TeamMember] as string | null;
-                        if (!val) return null;
+                        if (!val || val === "_none_") return null;
                         const Icon = def.displayIcon;
                         return (
                           <div

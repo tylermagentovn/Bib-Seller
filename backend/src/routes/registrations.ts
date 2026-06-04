@@ -10,10 +10,10 @@ const router = Router();
 
 const teamMemberSchema = z.object({
   fullName: z.string().min(1),
-  phone: z.string().min(9),
+  phone: z.string().optional().default(""),
   gender: z.string().nullable().optional(),
   email: z.string().email().optional().or(z.literal("")),
-  dob: z.string().optional(),
+  dob: z.string().nullable().optional(),
   idNumber: z.string().nullable().optional(),
   shirtSize: z.string().nullable().optional(),
   bloodType: z.string().nullable().optional(),
@@ -172,6 +172,7 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
       registrationId: registration.id,
       eventName: registration.event.name,
       continueUrl,
+      teamMembers: registration.teamMembers.length > 0 ? registration.teamMembers : undefined,
     }).catch(console.error);
   }
 

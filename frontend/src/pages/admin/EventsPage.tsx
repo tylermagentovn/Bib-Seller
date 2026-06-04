@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, X, Loader2, Calendar, MapPin, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2, Calendar, MapPin, Upload, Settings2 } from "lucide-react";
 
 const FIELD_CONFIG_ITEMS: { key: keyof FieldConfig; label: string }[] = [
   { key: "fullName", label: "Họ và tên" },
@@ -38,6 +38,32 @@ const DEFAULT_FIELD_CONFIG: FieldConfig = {
   medicalConditions: "hidden",
   emergencyName: "required",
   emergencyPhone: "required",
+};
+
+const MEMBER_FIELD_CONFIG_ITEMS: { key: keyof FieldConfig; label: string }[] = [
+  { key: "phone", label: "Số điện thoại" },
+  { key: "email", label: "Email" },
+  { key: "gender", label: "Giới tính" },
+  { key: "dob", label: "Ngày sinh" },
+  { key: "idNumber", label: "Số CCCD" },
+  { key: "shirtSize", label: "Size áo" },
+  { key: "bloodType", label: "Nhóm máu" },
+  { key: "medicalConditions", label: "Bệnh lý" },
+  { key: "emergencyName", label: "Tên liên hệ khẩn cấp" },
+  { key: "emergencyPhone", label: "SDT liên hệ khẩn cấp" },
+];
+
+const DEFAULT_MEMBER_FIELD_CONFIG: FieldConfig = {
+  phone: "required",
+  email: "optional",
+  gender: "optional",
+  dob: "required",
+  idNumber: "optional",
+  shirtSize: "optional",
+  bloodType: "hidden",
+  medicalConditions: "hidden",
+  emergencyName: "optional",
+  emergencyPhone: "optional",
 };
 
 const distanceSchema = z.object({
@@ -99,6 +125,8 @@ export function AdminEventsPage() {
   const [raceKitUrl, setRaceKitUrl] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
   const [fieldConfig, setFieldConfig] = useState<FieldConfig>({ ...DEFAULT_FIELD_CONFIG });
+  const [memberFieldConfigs, setMemberFieldConfigs] = useState<(FieldConfig | null)[]>([]);
+  const [memberFieldModalIndex, setMemberFieldModalIndex] = useState<number | null>(null);
 
   const openCreate = () => {
     reset({ status: "DRAFT", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
@@ -109,6 +137,7 @@ export function AdminEventsPage() {
     setRaceKitUploadedUrls([]);
     setCoverUploadedUrl("");
     setFieldConfig({ ...DEFAULT_FIELD_CONFIG });
+    setMemberFieldConfigs([null]);
     setEditing(null);
     setShowForm(true);
   };
@@ -146,6 +175,9 @@ export function AdminEventsPage() {
     setRaceKitUploadedUrls([]);
     setCoverUploadedUrl("");
     setFieldConfig({ ...DEFAULT_FIELD_CONFIG, ...(event.fieldConfig ?? {}) });
+    setMemberFieldConfigs(event.distances.map((d) =>
+      d.type === "RELAY" ? { ...DEFAULT_MEMBER_FIELD_CONFIG, ...(d.memberFieldConfig ?? {}) } : null
+    ));
     setEditing(event);
     setShowForm(true);
   };
@@ -192,7 +224,20 @@ export function AdminEventsPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit((d) => { const payload = { ...d, imageUrl: coverUrl, shirtSizeImageUrl: shirtSizeUrl, raceKitImageUrl: raceKitUrl, fieldConfig }; saveMutation.mutate(payload); })} className="p-5 space-y-4">
+            <form onSubmit={handleSubmit((d) => {
+              const payload = {
+                ...d,
+                imageUrl: coverUrl,
+                shirtSizeImageUrl: shirtSizeUrl,
+                raceKitImageUrl: raceKitUrl,
+                fieldConfig,
+                distances: d.distances.map((dist, i) => ({
+                  ...dist,
+                  memberFieldConfig: dist.type === "RELAY" ? (memberFieldConfigs[i] ?? DEFAULT_MEMBER_FIELD_CONFIG) : null,
+                })),
+              };
+              saveMutation.mutate(payload as any);
+            })} className="p-5 space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Tên sự kiện *</Label>
@@ -493,7 +538,10 @@ export function AdminEventsPage() {
               <div className="border-t pt-4">
                 <div className="flex items-center justify-between mb-3">
                   <Label className="text-base">Các cự ly</Label>
-                  <Button type="button" size="sm" variant="outline" onClick={() => append({ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null })}>
+                  <Button type="button" size="sm" variant="outline" onClick={() => {
+                    append({ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null });
+                    setMemberFieldConfigs((prev) => [...prev, null]);
+                  }}>
                     <Plus className="h-3.5 w-3.5 mr-1" /> Thêm cự ly
                   </Button>
                 </div>
@@ -503,7 +551,10 @@ export function AdminEventsPage() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700">Cự ly {i + 1}</span>
                       {fields.length > 1 && (
-                        <button type="button" onClick={() => remove(i)} className="text-red-400 hover:text-red-600">
+                        <button type="button" onClick={() => {
+                          remove(i);
+                          setMemberFieldConfigs((prev) => prev.filter((_, idx) => idx !== i));
+                        }} className="text-red-400 hover:text-red-600">
                           <X className="h-4 w-4" />
                         </button>
                       )}
@@ -517,12 +568,21 @@ export function AdminEventsPage() {
                         <Label className="text-xs">Loại</Label>
                         <Select
                           value={watch(`distances.${i}.type`) ?? "SOLO"}
-                          onValueChange={(v) => setValue(`distances.${i}.type`, v as "SOLO" | "RELAY")}
+                          onValueChange={(v) => {
+                            setValue(`distances.${i}.type`, v as "SOLO" | "RELAY");
+                            if (v === "RELAY") {
+                              setMemberFieldConfigs((prev) => {
+                                const next = [...prev];
+                                next[i] = next[i] ?? { ...DEFAULT_MEMBER_FIELD_CONFIG };
+                                return next;
+                              });
+                            }
+                          }}
                         >
                           <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="SOLO">Solo</SelectItem>
-                            <SelectItem value="RELAY">Relay</SelectItem>
+                            <SelectItem value="RELAY">Nhóm</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -572,6 +632,18 @@ export function AdminEventsPage() {
                         <Input className="h-8 text-sm" type="number" {...register(`distances.${i}.bibEnd`, { valueAsNumber: true })} />
                       </div>
                     </div>
+                    {watch(`distances.${i}.type`) === "RELAY" && (
+                      <div className="flex justify-end mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setMemberFieldModalIndex(i)}
+                          className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 rounded-lg px-3 py-1.5 transition-colors"
+                        >
+                          <Settings2 className="h-3.5 w-3.5" />
+                          Cấu hình form thành viên
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -588,6 +660,60 @@ export function AdminEventsPage() {
                 </p>
               )}
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Member field config modal */}
+      {memberFieldModalIndex !== null && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl">
+            <div className="flex items-center justify-between p-5 border-b">
+              <div>
+                <h3 className="font-bold text-base">Cấu hình form thành viên</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Cự ly {memberFieldModalIndex + 1} — Nhóm</p>
+              </div>
+              <button onClick={() => setMemberFieldModalIndex(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-2">
+              <p className="text-xs text-gray-400 mb-3">Họ tên thành viên luôn bắt buộc. Các trường còn lại có thể tùy chỉnh.</p>
+              {MEMBER_FIELD_CONFIG_ITEMS.map(({ key, label }) => {
+                const cfg = memberFieldConfigs[memberFieldModalIndex] ?? DEFAULT_MEMBER_FIELD_CONFIG;
+                const current = cfg[key] ?? DEFAULT_MEMBER_FIELD_CONFIG[key] ?? "hidden";
+                return (
+                  <div key={key} className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-gray-700 flex-1">{label}</span>
+                    <div className="flex rounded-lg border overflow-hidden shrink-0 text-xs font-medium">
+                      {(["required", "optional", "hidden"] as FieldVisibility[]).map((vis) => (
+                        <button
+                          key={vis}
+                          type="button"
+                          onClick={() => setMemberFieldConfigs((prev) => {
+                            const next = [...prev];
+                            next[memberFieldModalIndex] = { ...(next[memberFieldModalIndex] ?? DEFAULT_MEMBER_FIELD_CONFIG), [key]: vis };
+                            return next;
+                          })}
+                          className={`px-2.5 py-1 transition-colors ${
+                            current === vis
+                              ? vis === "required" ? "bg-indigo-600 text-white"
+                                : vis === "optional" ? "bg-amber-500 text-white"
+                                : "bg-gray-400 text-white"
+                              : "bg-white text-gray-400 hover:bg-gray-50"
+                          }`}
+                        >
+                          {vis === "required" ? "Bắt buộc" : vis === "optional" ? "Tùy chọn" : "Ẩn"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end p-4 border-t">
+              <Button onClick={() => setMemberFieldModalIndex(null)}>Xong</Button>
+            </div>
           </div>
         </div>
       )}
