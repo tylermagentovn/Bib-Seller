@@ -49,7 +49,11 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData) {
         .info-table td { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
         .info-table td:first-child { color: #888; font-size: 14px; width: 40%; }
         .info-table td:last-child { font-weight: 600; }
-        .footer { background: #f9f9f9; padding: 20px 32px; text-align: center; color: #999; font-size: 13px; }
+        .footer { background: #f9f9f9; padding: 24px 32px; text-align: center; color: #999; font-size: 13px; }
+        .footer a { color: #6366f1; text-decoration: none; }
+        .footer .brand { font-weight: 600; color: #555; margin-bottom: 6px; }
+        .footer .contact { margin: 6px 0; }
+        .footer .unsub { margin-top: 12px; font-size: 12px; border-top: 1px solid #eee; padding-top: 12px; }
       </style>
     </head>
     <body>
@@ -83,7 +87,12 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData) {
           <p style="color:#666; font-size:14px;">Vui lòng mang theo email này hoặc số BIB vào ngày thi đấu. Chúc bạn thi đấu thật tốt!</p>
         </div>
         <div class="footer">
-          Email này được gửi tự động từ hệ thống BIB Register. Vui lòng không trả lời email này.
+          <div class="brand">Bib1s - Giải pháp quản lý giải đấu thể thao chuyên nghiệp</div>
+          <div class="contact">📞 <a href="tel:0918226017">0918 226 017</a></div>
+          <div class="contact">📘 <a href="https://facebook.com/bib1s" target="_blank">facebook.com/bib1s</a></div>
+          <div class="unsub">Email này được gửi tự động. Vui lòng không trả lời.<br/>
+            <a href="${process.env.FRONTEND_URL ?? "http://localhost:5173"}/unsubscribe?email=${encodeURIComponent(data.to)}">Hủy nhận email</a>
+          </div>
         </div>
       </div>
     </body>
@@ -93,7 +102,7 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData) {
   await transporter.sendMail({
     from: process.env.EMAIL_FROM,
     to: data.to,
-    subject: `[BIB #${data.bibNumber}] Xác nhận đăng ký ${data.eventName}`,
+    subject: `${data.eventName} - Xác nhận lựa chọn số BIB`,
     html,
   });
 }
@@ -120,7 +129,11 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
         .header p { margin: 8px 0 0; opacity: 0.85; }
         .body { padding: 32px; }
         .btn { display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; }
-        .footer { background: #f9f9f9; padding: 20px 32px; text-align: center; color: #999; font-size: 13px; }
+        .footer { background: #f9f9f9; padding: 24px 32px; text-align: center; color: #999; font-size: 13px; }
+        .footer a { color: #6366f1; text-decoration: none; }
+        .footer .brand { font-weight: 600; color: #555; margin-bottom: 6px; }
+        .footer .contact { margin: 6px 0; }
+        .footer .unsub { margin-top: 12px; font-size: 12px; border-top: 1px solid #eee; padding-top: 12px; }
       </style>
     </head>
     <body>
@@ -138,7 +151,14 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
           </p>
           <p style="color: #888; font-size: 13px;">Nếu nút không hoạt động, sao chép đường dẫn sau vào trình duyệt:<br/><a href="${data.continueUrl}">${data.continueUrl}</a></p>
         </div>
-        <div class="footer">Email này được gửi tự động từ hệ thống BIB Register. Vui lòng không trả lời email này.</div>
+        <div class="footer">
+          <div class="brand">Bib1s - Giải pháp quản lý giải đấu thể thao chuyên nghiệp</div>
+          <div class="contact">📞 <a href="tel:0918226017">0918 226 017</a></div>
+          <div class="contact">📘 <a href="https://facebook.com/bib1s" target="_blank">facebook.com/bib1s</a></div>
+          <div class="unsub">Email này được gửi tự động. Vui lòng không trả lời.<br/>
+            <a href="${process.env.FRONTEND_URL ?? "http://localhost:5173"}/unsubscribe?email=${encodeURIComponent(data.to)}">Hủy nhận email</a>
+          </div>
+        </div>
       </div>
     </body>
     </html>
@@ -147,7 +167,7 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
   await transporter.sendMail({
     from: process.env.EMAIL_FROM,
     to: data.to,
-    subject: `Đăng ký thành công - ${data.eventName}`,
+    subject: `${data.eventName} - Thanh toán đơn hàng #${data.registrationId.slice(-8).toUpperCase()} thành công`,
     html,
   });
 }

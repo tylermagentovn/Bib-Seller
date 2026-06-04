@@ -15,6 +15,7 @@ import { UserLoginPage } from "@/pages/UserLoginPage";
 import { UserRegisterPage } from "@/pages/UserRegisterPage";
 import { BibsPage } from "@/pages/account/BibsPage";
 import { ProfilePage } from "@/pages/account/ProfilePage";
+import { UnsubscribePage } from "@/pages/UnsubscribePage";
 
 import { AdminLoginPage } from "@/pages/admin/LoginPage";
 import { AdminDashboardPage } from "@/pages/admin/DashboardPage";
@@ -51,6 +52,7 @@ function PublicLayout() {
           <Route path="/register" element={<UserRegisterPage />} />
           <Route path="/account/bibs" element={<RequireUser><BibsPage /></RequireUser>} />
           <Route path="/account/profile" element={<RequireUser><ProfilePage /></RequireUser>} />
+          <Route path="/unsubscribe" element={<UnsubscribePage />} />
         </Routes>
       </div>
       <footer className="bg-white border-t py-4 text-center text-xs text-gray-400">
