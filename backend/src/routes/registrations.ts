@@ -298,7 +298,7 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
 
 // Admin: list all registrations
 router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) => {
-  const { eventId, status, page = "1", limit = "50" } = req.query;
+  const { eventId, status, page = "1", limit = "50", from } = req.query;
   const where: Record<string, unknown> = {};
   if (eventId) {
     where.eventId = eventId;
@@ -307,9 +307,10 @@ router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) =>
     where.eventId = { in: ids };
   }
   if (status) where.status = status;
+  if (from) where.createdAt = { gte: new Date(from as string) };
 
   const skip = (Number(page) - 1) * Number(limit);
-  const [registrations, total] = await Promise.all([
+  const [registrations, total, paidCount, pendingCount] = await Promise.all([
     prisma.registration.findMany({
       where,
       include: { event: true, distance: true, payment: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
@@ -318,9 +319,11 @@ router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) =>
       take: Number(limit),
     }),
     prisma.registration.count({ where }),
+    prisma.registration.count({ where: { ...where, status: "PAID" } }),
+    prisma.registration.count({ where: { ...where, status: "PENDING" } }),
   ]);
 
-  res.json({ registrations, total, page: Number(page), limit: Number(limit) });
+  res.json({ registrations, total, page: Number(page), limit: Number(limit), paidCount, pendingCount });
 });
 
 // Public: sign disclaimer

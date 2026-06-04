@@ -3,7 +3,11 @@ import { Calendar, BadgeCheck, Shirt, Droplets, HeartPulse, Shield, CircleUser }
 import type { FieldConfig } from "@/lib/api";
 
 export const GENDERS = ["Nam", "Nữ", "Khác"] as const;
-export const SHIRT_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL"];
+export const SHIRT_SIZES = [
+  "Nam - XS", "Nam - S", "Nam - M", "Nam - L", "Nam - XL", "Nam - XXL",
+  "Nữ - XS", "Nữ - S", "Nữ - M", "Nữ - L", "Nữ - XL", "Nữ - XXL",
+  "Kids XS", "Kids S", "Kids M", "Kids L", "Kids XL", "Kids XXL",
+];
 export const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Không biết"];
 
 export type MemberFieldType = "text" | "tel" | "date" | "select" | "textarea";
