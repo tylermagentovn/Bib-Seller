@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Registration, type TeamMember } from "@/lib/api";
 import { MEMBER_FIELD_DEFS, GENDERS, SHIRT_SIZES, BLOOD_TYPES, initFieldValue, normalizeFieldValue } from "@/lib/memberFields";
@@ -708,6 +708,15 @@ export function AdminRegistrationsPage() {
   const [editingReg, setEditingReg] = useState<Registration | null>(null);
   const [newBib, setNewBib] = useState("");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [search]);
   const [detailReg, setDetailReg] = useState<Registration | null>(null);
   const [deletingReg, setDeletingReg] = useState<Registration | null>(null);
   const [changingStatusReg, setChangingStatusReg] = useState<Registration | null>(null);
@@ -735,10 +744,11 @@ export function AdminRegistrationsPage() {
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-registrations", { page, status: statusFilter }],
+    queryKey: ["admin-registrations", { page, status: statusFilter, search: debouncedSearch }],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
       if (statusFilter !== "ALL") params.set("status", statusFilter);
+      if (debouncedSearch) params.set("search", debouncedSearch);
       return api.get(`/registrations/admin/all?${params}`).then((r) => r.data);
     },
   });
@@ -773,15 +783,6 @@ export function AdminRegistrationsPage() {
   const registrations: Registration[] = data?.registrations ?? [];
   const total: number = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
-
-  const filtered = search
-    ? registrations.filter(
-        (r) =>
-          r.fullName.toLowerCase().includes(search.toLowerCase()) ||
-          r.email.toLowerCase().includes(search.toLowerCase()) ||
-          r.phone.includes(search)
-      )
-    : registrations;
 
   const statusBadge = (status: string) => {
     if (status === "PAID") return <Badge variant="success">Đã TT</Badge>;
@@ -850,9 +851,9 @@ export function AdminRegistrationsPage() {
                 <tr><td colSpan={7} className="text-center py-12">
                   <Loader2 className="h-5 w-5 animate-spin text-indigo-600 mx-auto" />
                 </td></tr>
-              ) : filtered.length === 0 ? (
+              ) : registrations.length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-12 text-gray-400">Không có dữ liệu</td></tr>
-              ) : filtered.map((reg) => (
+              ) : registrations.map((reg) => (
                 <tr
                   key={reg.id}
                   className="hover:bg-gray-50 transition-colors cursor-pointer"

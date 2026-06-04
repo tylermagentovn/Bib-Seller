@@ -298,7 +298,7 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
 
 // Admin: list all registrations
 router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) => {
-  const { eventId, status, page = "1", limit = "50", from } = req.query;
+  const { eventId, status, page = "1", limit = "50", from, search } = req.query;
   const where: Record<string, unknown> = {};
   if (eventId) {
     where.eventId = eventId;
@@ -308,6 +308,14 @@ router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) =>
   }
   if (status) where.status = status;
   if (from) where.createdAt = { gte: new Date(from as string) };
+  if (search) {
+    const q = (search as string).trim();
+    where.OR = [
+      { fullName: { contains: q, mode: "insensitive" } },
+      { email: { contains: q, mode: "insensitive" } },
+      { phone: { contains: q } },
+    ];
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
   const [registrations, total, paidCount, pendingCount] = await Promise.all([
