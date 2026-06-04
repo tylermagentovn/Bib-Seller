@@ -25,7 +25,7 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
-const pwSchema = z.object({
+const pwSchemaWithCurrent = z.object({
   currentPassword: z.string().min(1, "Nhập mật khẩu hiện tại"),
   newPassword: z.string().min(6, "Mật khẩu mới ít nhất 6 ký tự"),
   confirmPassword: z.string(),
@@ -33,26 +33,76 @@ const pwSchema = z.object({
   message: "Mật khẩu xác nhận không khớp",
   path: ["confirmPassword"],
 });
-type PwForm = z.infer<typeof pwSchema>;
 
-function ChangePasswordForm() {
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<PwForm>({
-    resolver: zodResolver(pwSchema),
+const pwSchemaWithoutCurrent = z.object({
+  newPassword: z.string().min(6, "Mật khẩu mới ít nhất 6 ký tự"),
+  confirmPassword: z.string(),
+}).refine((d) => d.newPassword === d.confirmPassword, {
+  message: "Mật khẩu xác nhận không khớp",
+  path: ["confirmPassword"],
+});
+
+type PwFormWithCurrent = z.infer<typeof pwSchemaWithCurrent>;
+type PwFormWithoutCurrent = z.infer<typeof pwSchemaWithoutCurrent>;
+
+function ChangePasswordForm({ hasPassword }: { hasPassword: boolean }) {
+  const formWithCurrent = useForm<PwFormWithCurrent>({
+    resolver: zodResolver(pwSchemaWithCurrent),
+  });
+  const formWithoutCurrent = useForm<PwFormWithoutCurrent>({
+    resolver: zodResolver(pwSchemaWithoutCurrent),
   });
 
   const mutation = useMutation({
-    mutationFn: (data: PwForm) =>
-      userApi.put("/users/me/password", {
-        currentPassword: data.currentPassword,
-        newPassword: data.newPassword,
-      }).then((r) => r.data),
-    onSuccess: () => reset(),
+    mutationFn: (data: { currentPassword?: string; newPassword: string }) =>
+      userApi.put("/users/me/password", data).then((r) => r.data),
+    onSuccess: () => {
+      formWithCurrent.reset();
+      formWithoutCurrent.reset();
+    },
   });
 
+  if (!hasPassword) {
+    const { register, handleSubmit, formState: { errors } } = formWithoutCurrent;
+    return (
+      <div className="bg-white rounded-xl border p-5 space-y-4">
+        <div>
+          <p className="text-sm font-semibold text-gray-700">Đặt mật khẩu</p>
+          <p className="text-xs text-gray-400 mt-0.5">Tài khoản Google — đặt mật khẩu để có thể đăng nhập bằng email</p>
+        </div>
+        <form onSubmit={handleSubmit((d) => mutation.mutate({ newPassword: d.newPassword }))} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Mật khẩu mới</Label>
+            <Input type="password" autoComplete="new-password" {...register("newPassword")} />
+            {errors.newPassword && <p className="text-xs text-red-500">{errors.newPassword.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Xác nhận mật khẩu mới</Label>
+            <Input type="password" autoComplete="new-password" {...register("confirmPassword")} />
+            {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword.message}</p>}
+          </div>
+          {mutation.isError && (
+            <p className="text-sm text-red-500">{(mutation.error as any)?.response?.data?.error ?? "Lỗi đặt mật khẩu"}</p>
+          )}
+          <Button type="submit" variant="outline" className="w-full" disabled={mutation.isPending}>
+            {mutation.isPending ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" />Đang lưu...</>
+            ) : mutation.isSuccess ? (
+              <><CheckCircle className="h-4 w-4 mr-2 text-green-600" />Đã đặt mật khẩu</>
+            ) : (
+              "Đặt mật khẩu"
+            )}
+          </Button>
+        </form>
+      </div>
+    );
+  }
+
+  const { register, handleSubmit, formState: { errors } } = formWithCurrent;
   return (
     <div className="bg-white rounded-xl border p-5 space-y-4">
       <p className="text-sm font-semibold text-gray-700">Đổi mật khẩu</p>
-      <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-3">
+      <form onSubmit={handleSubmit((d) => mutation.mutate({ currentPassword: d.currentPassword, newPassword: d.newPassword }))} className="space-y-3">
         <div className="space-y-1.5">
           <Label>Mật khẩu hiện tại</Label>
           <Input type="password" autoComplete="current-password" {...register("currentPassword")} />
@@ -238,7 +288,7 @@ export function ProfilePage() {
       <ProfileForm key={user.id} user={user} updateUser={updateUser} />
 
       <div className="mt-5">
-        <ChangePasswordForm />
+        <ChangePasswordForm hasPassword={user.hasPassword} />
       </div>
     </div>
   );

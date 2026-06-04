@@ -107,7 +107,7 @@ router.post("/register", async (req: Request, res: Response) => {
     select: USER_SELECT,
   });
   const token = makeToken(user.id);
-  res.status(201).json({ token, user });
+  res.status(201).json({ token, user: { ...user, hasPassword: true } });
 });
 
 // POST /users/login
@@ -119,23 +119,79 @@ router.post("/login", async (req: Request, res: Response) => {
   }
   const { email, password } = parsed.data;
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.password))) {
+  if (!user) {
     res.status(401).json({ error: "Email hoặc mật khẩu không đúng" });
     return;
   }
-  const { password: _pw, ...userData } = user;
+  if (!user.password) {
+    res.status(401).json({ error: "Tài khoản này đăng nhập bằng Google. Vui lòng dùng nút 'Đăng nhập với Google'." });
+    return;
+  }
+  if (!(await bcrypt.compare(password, user.password))) {
+    res.status(401).json({ error: "Email hoặc mật khẩu không đúng" });
+    return;
+  }
+  const { password: _pw, googleId: _gid, ...userData } = user;
   const token = makeToken(user.id);
-  res.json({ token, user: userData });
+  res.json({ token, user: { ...userData, hasPassword: true } });
+});
+
+// POST /users/auth/google
+router.post("/auth/google", async (req: Request, res: Response) => {
+  const { accessToken } = req.body;
+  if (!accessToken || typeof accessToken !== "string") {
+    res.status(400).json({ error: "Thiếu accessToken" });
+    return;
+  }
+  let googleUser: { sub?: string; email?: string; name?: string };
+  try {
+    const r = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!r.ok) throw new Error("invalid token");
+    googleUser = await r.json();
+  } catch {
+    res.status(401).json({ error: "Token Google không hợp lệ" });
+    return;
+  }
+  if (!googleUser.email || !googleUser.sub) {
+    res.status(401).json({ error: "Không lấy được thông tin từ Google" });
+    return;
+  }
+  const { sub: googleId, email, name: fullName } = googleUser;
+
+  let user = await prisma.user.findFirst({
+    where: { OR: [{ googleId }, { email }] },
+  });
+
+  if (user) {
+    // Link Google ID nếu chưa có
+    if (!user.googleId) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { googleId },
+      });
+    }
+  } else {
+    user = await prisma.user.create({
+      data: { email, googleId, fullName: fullName ?? null },
+    });
+  }
+
+  const { password: _pw, googleId: _gid, ...userData } = user;
+  const token = makeToken(user.id);
+  res.json({ token, user: { ...userData, hasPassword: !!_pw } });
 });
 
 // GET /users/me
 router.get("/me", requireUserAuth, async (req: UserRequest, res: Response) => {
   const user = await prisma.user.findUnique({
     where: { id: req.userId },
-    select: USER_SELECT,
+    select: { ...USER_SELECT, password: true },
   });
   if (!user) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(user);
+  const { password, ...userData } = user;
+  res.json({ ...userData, hasPassword: !!password });
 });
 
 // PUT /users/me
@@ -156,22 +212,33 @@ router.put("/me", requireUserAuth, async (req: UserRequest, res: Response) => {
 
 // PUT /users/me/password
 router.put("/me/password", requireUserAuth, async (req: UserRequest, res: Response) => {
-  const parsed = changePasswordSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.flatten() });
-    return;
-  }
   const user = await prisma.user.findUnique({ where: { id: req.userId } });
   if (!user) { res.status(404).json({ error: "Not found" }); return; }
 
-  const valid = await bcrypt.compare(parsed.data.currentPassword, user.password);
-  if (!valid) {
-    res.status(400).json({ error: "Mật khẩu hiện tại không đúng" });
-    return;
+  if (user.password) {
+    // Tài khoản thường — yêu cầu mật khẩu hiện tại
+    const parsed = changePasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() }); return;
+    }
+    const valid = await bcrypt.compare(parsed.data.currentPassword, user.password);
+    if (!valid) {
+      res.status(400).json({ error: "Mật khẩu hiện tại không đúng" }); return;
+    }
+    const hashed = await bcrypt.hash(parsed.data.newPassword, 12);
+    await prisma.user.update({ where: { id: req.userId }, data: { password: hashed } });
+  } else {
+    // Tài khoản Google — đặt mật khẩu mới trực tiếp
+    const parsed = z.object({
+      newPassword: z.string().min(6, "Mật khẩu mới ít nhất 6 ký tự"),
+    }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() }); return;
+    }
+    const hashed = await bcrypt.hash(parsed.data.newPassword, 12);
+    await prisma.user.update({ where: { id: req.userId }, data: { password: hashed } });
   }
 
-  const hashed = await bcrypt.hash(parsed.data.newPassword, 12);
-  await prisma.user.update({ where: { id: req.userId }, data: { password: hashed } });
   res.json({ message: "Đổi mật khẩu thành công" });
 });
 

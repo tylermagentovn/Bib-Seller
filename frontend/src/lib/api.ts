@@ -45,6 +45,7 @@ userApi.interceptors.response.use(
 export interface User {
   id: string;
   email: string;
+  hasPassword: boolean;
   fullName: string | null;
   phone: string | null;
   gender: string | null;

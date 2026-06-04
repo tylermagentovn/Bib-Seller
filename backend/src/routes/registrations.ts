@@ -221,9 +221,10 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
   };
 
   const headers = [
-    "ID", "Ho ten", "Ngay sinh", "Dien thoai", "Email",
-    "Su kien", "Cu ly", "Loai", "BIB",
+    "ID", "Ho ten", "Gioi tinh", "Ngay sinh", "Dien thoai", "Email",
+    "So CCCD", "Size ao", "Nhom mau", "Benh ly",
     "Lien he khan cap", "SDT khan cap",
+    "Su kien", "Cu ly", "Loai", "BIB",
     "Trang thai", "So tien (VND)", "Thoi gian thanh toan", "Ma tham chieu",
     "Da ky mien tru", "Thanh vien nhom",
     "Ngay dang ky",
@@ -231,21 +232,38 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
 
   const rows = registrations.map((r) => {
     const members = r.teamMembers
-      .map((m) => `${m.memberIndex}.${m.fullName}(${m.phone})`)
+      .map((m) => {
+        const parts = [
+          `${m.memberIndex}.${m.fullName}`,
+          m.phone,
+          m.gender ?? "",
+          m.dob ? m.dob.toISOString().split("T")[0] : "",
+          m.idNumber ?? "",
+          m.shirtSize ?? "",
+          m.bloodType ?? "",
+          m.emergencyName ? `KC:${m.emergencyName}(${m.emergencyPhone ?? ""})` : "",
+        ].filter(Boolean);
+        return parts.join("|");
+      })
       .join("; ");
 
     return [
       r.id,
       r.fullName ?? "",
+      r.gender ?? "",
       r.dob ? r.dob.toISOString().split("T")[0] : "",
       r.phone ?? "",
       r.email ?? "",
+      r.idNumber ?? "",
+      r.shirtSize ?? "",
+      r.bloodType ?? "",
+      r.medicalConditions ?? "",
+      r.emergencyName ?? "",
+      r.emergencyPhone ?? "",
       r.event.name,
       r.distance.name,
       r.distance.type === "RELAY" ? "Tiep suc" : "Ca nhan",
       r.bibNumber ?? "",
-      r.emergencyName ?? "",
-      r.emergencyPhone ?? "",
       r.status === "PAID" ? "Da thanh toan" : r.status === "CANCELLED" ? "Da huy" : "Cho thanh toan",
       r.payment?.amount ?? "",
       r.payment?.paidAt ? r.payment.paidAt.toISOString().replace("T", " ").slice(0, 19) : "",
