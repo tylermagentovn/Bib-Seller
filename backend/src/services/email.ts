@@ -138,6 +138,7 @@ interface RegistrationSuccessEmailData {
   eventName: string;
   continueUrl: string;
   teamMembers?: TeamMemberEmailInfo[];
+  customFields?: { label: string; value: string }[];
 }
 
 export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmailData) {
@@ -184,6 +185,16 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
               <td style="padding: 8px 10px; color: #888;">${m.memberIndex}</td>
               <td style="padding: 8px 10px; font-weight: 600;">${m.fullName}</td>
               <td style="padding: 8px 10px; color: #555;">${[m.phone, m.email].filter(Boolean).join(" / ") || "—"}</td>
+            </tr>`).join("")}
+          </table>
+          ` : ""}
+          ${data.customFields && data.customFields.length > 0 ? `
+          <h3 style="margin: 24px 0 12px; color: #444; font-size: 15px; border-top: 1px solid #f0f0f0; padding-top: 20px;">Thông tin bổ sung</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            ${data.customFields.map(f => `
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+              <td style="padding: 8px 10px; color: #888; width: 40%;">${f.label}</td>
+              <td style="padding: 8px 10px; font-weight: 500;">${f.value || "—"}</td>
             </tr>`).join("")}
           </table>
           ` : ""}

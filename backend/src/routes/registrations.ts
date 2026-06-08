@@ -37,6 +37,10 @@ const registrationSchema = z.object({
   emergencyName: z.string().optional(),
   emergencyPhone: z.string().optional(),
   teamMembers: z.array(teamMemberSchema).optional(),
+  customFieldValues: z.array(z.object({
+    fieldDefId: z.string(),
+    value: z.string(),
+  })).optional().default([]),
 });
 
 // Returns the eventId filter for EVENT_MANAGER (only their own events)
@@ -108,7 +112,7 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
   const timeoutMinutes = Number(process.env.PAYMENT_TIMEOUT_MINUTES ?? 15);
   const expiresAt = new Date(Date.now() + timeoutMinutes * 60 * 1000);
 
-  const { teamMembers, ...registrationData } = data;
+  const { teamMembers, customFieldValues, ...registrationData } = data;
 
   const registration = await prisma.registration.create({
     data: {
@@ -157,15 +161,38 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
     include: {
       payment: true,
       distance: true,
-      event: true,
+      event: { include: { customFieldDefs: { orderBy: { order: "asc" } } } },
       teamMembers: true,
+      customFieldValues: { include: { fieldDef: true } },
     },
   });
+
+  // Save custom field values
+  if (customFieldValues.length > 0) {
+    await prisma.customFieldValue.createMany({
+      data: customFieldValues.map((v) => ({
+        registrationId: registration.id,
+        fieldDefId: v.fieldDefId,
+        value: v.value,
+      })),
+      skipDuplicates: true,
+    });
+  }
 
   // Send success email for free registrations (fire-and-forget)
   if (isFree && registration.email) {
     const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
     const continueUrl = `${frontend.replace(/\/$/, "")}/payment/${registration.id}/success?step=waiver`;
+    const emailCustomFields = (registration.event as any).customFieldDefs
+      ?.filter((d: any) => d.includeInEmail)
+      .map((d: any) => {
+        const cv = registration.customFieldValues?.find((v: any) => v.fieldDefId === d.id);
+        const raw = cv?.value ?? "";
+        let display = raw;
+        try { const arr = JSON.parse(raw); if (Array.isArray(arr)) display = arr.join(", "); } catch {}
+        return { label: d.label, value: display };
+      })
+      .filter((f: any) => f.value !== "") ?? [];
     sendRegistrationSuccessEmail({
       to: registration.email,
       fullName: registration.fullName ?? null,
@@ -173,6 +200,7 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
       eventName: registration.event.name,
       continueUrl,
       teamMembers: registration.teamMembers.length > 0 ? registration.teamMembers : undefined,
+      customFields: emailCustomFields.length > 0 ? emailCustomFields : undefined,
     }).catch(console.error);
   }
 
@@ -199,7 +227,13 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
 router.get("/:id", async (req: Request, res: Response) => {
   const registration = await prisma.registration.findUnique({
     where: { id: req.params.id as string },
-    include: { payment: true, distance: true, event: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
+    include: {
+      payment: true,
+      distance: true,
+      event: { include: { customFieldDefs: { orderBy: { order: "asc" } } } },
+      teamMembers: { orderBy: { memberIndex: "asc" } },
+      customFieldValues: { include: { fieldDef: true } },
+    },
   });
   if (!registration) {
     res.status(404).json({ error: "Not found" });
@@ -222,7 +256,13 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
 
   const registrations = await prisma.registration.findMany({
     where,
-    include: { event: true, distance: true, payment: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
+    include: {
+      event: { include: { customFieldDefs: { orderBy: { order: "asc" } } } },
+      distance: true,
+      payment: true,
+      teamMembers: { orderBy: { memberIndex: "asc" } },
+      customFieldValues: { include: { fieldDef: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -234,6 +274,18 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
       : s;
   };
 
+  // Collect custom field defs across all events in this export (preserving order)
+  const seenDefIds = new Set<string>();
+  const exportDefs: { id: string; label: string }[] = [];
+  for (const r of registrations) {
+    for (const def of (r.event as any).customFieldDefs ?? []) {
+      if (def.includeInExport && !seenDefIds.has(def.id)) {
+        seenDefIds.add(def.id);
+        exportDefs.push({ id: def.id, label: def.label });
+      }
+    }
+  }
+
   const headers = [
     "ID", "Ho ten", "Gioi tinh", "Ngay sinh", "Dien thoai", "Email",
     "So CCCD", "Size ao", "Nhom mau", "Benh ly",
@@ -242,6 +294,7 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
     "Trang thai", "So tien (VND)", "Thoi gian thanh toan", "Ma tham chieu",
     "Da ky mien tru", "Thanh vien nhom",
     "Ngay dang ky",
+    ...exportDefs.map((d) => d.label),
   ];
 
   const rows = registrations.map((r) => {
@@ -260,6 +313,13 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
         return parts.join("|");
       })
       .join("; ");
+
+    const customCols = exportDefs.map((def) => {
+      const cv = (r.customFieldValues as any[]).find((v) => v.fieldDefId === def.id);
+      const raw = cv?.value ?? "";
+      try { const arr = JSON.parse(raw); if (Array.isArray(arr)) return arr.join(", "); } catch {}
+      return raw;
+    });
 
     return [
       r.id,
@@ -285,6 +345,7 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
       r.disclaimerSignedAt ? "Co" : "Khong",
       members,
       r.createdAt.toISOString().replace("T", " ").slice(0, 19),
+      ...customCols,
     ].map(escape).join(",");
   });
 
@@ -321,7 +382,13 @@ router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) =>
   const [registrations, total, paidCount, pendingCount] = await Promise.all([
     prisma.registration.findMany({
       where,
-      include: { event: true, distance: true, payment: true, teamMembers: { orderBy: { memberIndex: "asc" } } },
+      include: {
+        event: { include: { customFieldDefs: { orderBy: { order: "asc" } } } },
+        distance: true,
+        payment: true,
+        teamMembers: { orderBy: { memberIndex: "asc" } },
+        customFieldValues: { include: { fieldDef: true } },
+      },
       orderBy: { createdAt: "desc" },
       skip,
       take: Number(limit),

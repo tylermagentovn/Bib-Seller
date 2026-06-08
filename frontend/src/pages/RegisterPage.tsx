@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { api, userApi, type Event, type FieldConfig, type FieldVisibility } from "@/lib/api";
+import { api, userApi, type Event, type FieldConfig, type FieldVisibility, type CustomFieldDef } from "@/lib/api";
 import { useUser } from "@/contexts/UserContext";
 import { MEMBER_FIELD_DEFS, GENDERS, SHIRT_SIZES, BLOOD_TYPES, type MemberFieldDef } from "@/lib/memberFields";
 import { formatCurrency } from "@/lib/utils";
@@ -261,6 +261,10 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
   const show = (key: keyof FieldConfig) => vis(cfg, key) !== "hidden";
   const isReq = (key: keyof FieldConfig) => vis(cfg, key) === "required";
 
+  const customDefs: CustomFieldDef[] = event.customFieldDefs ?? [];
+  const [customValues, setCustomValues] = useState<Record<string, string | string[]>>({});
+  const [customErrors, setCustomErrors] = useState<Record<string, string>>({});
+
   const isRelayRef = useRef(false);
   const cfgRef = useRef(cfg);
   const memberCfgRef = useRef<FieldConfig>({});
@@ -342,8 +346,32 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
   });
 
   const onSubmit = (data: FormData) => {
+    // Validate custom fields
+    const errs: Record<string, string> = {};
+    for (const def of customDefs) {
+      const val = customValues[def.id];
+      if (def.required) {
+        if (!val || (Array.isArray(val) ? val.length === 0 : val.trim() === "")) {
+          errs[def.id] = "Trường này là bắt buộc";
+        }
+      }
+    }
+    if (Object.keys(errs).length > 0) {
+      setCustomErrors(errs);
+      return;
+    }
+    setCustomErrors({});
+
+    const customFieldValues = customDefs.map((def) => {
+      const val = customValues[def.id] ?? "";
+      return {
+        fieldDefId: def.id,
+        value: Array.isArray(val) ? JSON.stringify(val) : val,
+      };
+    }).filter((v) => v.value !== "" && v.value !== "[]");
+
     const { disclaimer: _d, ...rest } = data;
-    mutation.mutate(rest);
+    mutation.mutate({ ...rest, customFieldValues } as any);
   };
 
   const fieldLabel = (key: keyof FieldConfig, defaultLabel: string) => (
@@ -600,6 +628,73 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Custom Fields */}
+            {customDefs.length > 0 && (
+              <div className="space-y-4 border-t pt-5">
+                <p className="text-sm font-semibold text-gray-700">Thông tin bổ sung</p>
+                {customDefs.map((def) => (
+                  <div key={def.id} className="space-y-1.5">
+                    <Label className="text-sm">
+                      {def.label}{def.required && <span className="text-red-500"> *</span>}
+                    </Label>
+                    {def.type === "TEXT" && (
+                      <Input
+                        value={(customValues[def.id] as string) ?? ""}
+                        onChange={(e) => setCustomValues((prev) => ({ ...prev, [def.id]: e.target.value }))}
+                      />
+                    )}
+                    {def.type === "NUMBER" && (
+                      <Input
+                        type="number"
+                        value={(customValues[def.id] as string) ?? ""}
+                        onChange={(e) => setCustomValues((prev) => ({ ...prev, [def.id]: e.target.value }))}
+                      />
+                    )}
+                    {def.type === "SELECT" && (
+                      <Select
+                        value={(customValues[def.id] as string) ?? ""}
+                        onValueChange={(v) => setCustomValues((prev) => ({ ...prev, [def.id]: v }))}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Chọn một..." /></SelectTrigger>
+                        <SelectContent>
+                          {(def.options ?? []).map((opt) => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {def.type === "CHECKBOX" && (
+                      <div className="space-y-2">
+                        {(def.options ?? []).map((opt) => {
+                          const arr = (customValues[def.id] as string[]) ?? [];
+                          return (
+                            <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
+                              <Checkbox
+                                checked={arr.includes(opt)}
+                                onCheckedChange={(checked) => {
+                                  setCustomValues((prev) => {
+                                    const current = (prev[def.id] as string[]) ?? [];
+                                    return {
+                                      ...prev,
+                                      [def.id]: checked ? [...current, opt] : current.filter((v) => v !== opt),
+                                    };
+                                  });
+                                }}
+                              />
+                              {opt}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {customErrors[def.id] && (
+                      <p className="text-xs text-red-500">{customErrors[def.id]}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
 

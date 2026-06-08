@@ -39,9 +39,10 @@ model Event {
   updatedAt   DateTime    @updatedAt
   createdById String?
 
-  createdBy     Admin?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  distances     Distance[]
-  registrations Registration[]
+  createdBy        Admin?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  distances        Distance[]
+  registrations    Registration[]
+  customFieldDefs  CustomFieldDef[]
 }
 
 model Distance {
@@ -106,11 +107,12 @@ model Registration {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
-  event       Event        @relation(fields: [eventId], references: [id])
-  distance    Distance     @relation(fields: [distanceId], references: [id])
-  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  payment     Payment?
-  teamMembers TeamMember[]
+  event             Event              @relation(fields: [eventId], references: [id])
+  distance          Distance           @relation(fields: [distanceId], references: [id])
+  user              User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payment           Payment?
+  teamMembers       TeamMember[]
+  customFieldValues CustomFieldValue[]
 
   @@index([eventId])
   @@index([distanceId])
@@ -159,6 +161,43 @@ model Payment {
   registration Registration @relation(fields: [registrationId], references: [id])
 
   @@index([payosOrderCode])
+}
+
+model CustomFieldDef {
+  id              String          @id @default(cuid())
+  eventId         String
+  event           Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  label           String
+  type            CustomFieldType
+  options         Json?
+  required        Boolean         @default(false)
+  includeInEmail  Boolean         @default(false)
+  includeInExport Boolean         @default(false)
+  order           Int             @default(0)
+
+  values CustomFieldValue[]
+
+  @@index([eventId])
+}
+
+model CustomFieldValue {
+  id             String         @id @default(cuid())
+  registrationId String
+  registration   Registration   @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  fieldDefId     String
+  fieldDef       CustomFieldDef @relation(fields: [fieldDefId], references: [id], onDelete: Cascade)
+  value          String
+
+  @@unique([registrationId, fieldDefId])
+  @@index([registrationId])
+  @@index([fieldDefId])
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  SELECT
+  CHECKBOX
 }
 
 enum AdminRole {

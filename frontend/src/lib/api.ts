@@ -61,6 +61,28 @@ export interface User {
 
 export type FieldVisibility = "required" | "optional" | "hidden";
 
+export type CustomFieldType = "TEXT" | "NUMBER" | "SELECT" | "CHECKBOX";
+
+export interface CustomFieldDef {
+  id: string;
+  eventId: string;
+  label: string;
+  type: CustomFieldType;
+  options?: string[] | null;
+  required: boolean;
+  includeInEmail: boolean;
+  includeInExport: boolean;
+  order: number;
+}
+
+export interface CustomFieldValue {
+  id: string;
+  registrationId: string;
+  fieldDefId: string;
+  fieldDef: CustomFieldDef;
+  value: string;
+}
+
 export interface FieldConfig {
   fullName?: FieldVisibility;
   phone?: FieldVisibility;
@@ -125,6 +147,7 @@ export interface Event {
   fieldConfig: FieldConfig | null;
   allowMultipleRegistrations: boolean;
   distances: Distance[];
+  customFieldDefs?: CustomFieldDef[];
   createdAt: string;
 }
 
@@ -152,6 +175,7 @@ export interface Registration {
   distance: Distance;
   payment: Payment | null;
   teamMembers: TeamMember[];
+  customFieldValues?: CustomFieldValue[];
 }
 
 export interface Payment {

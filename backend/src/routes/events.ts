@@ -16,7 +16,7 @@ const distanceWithCount = {
 router.get("/", async (_req: Request, res: Response) => {
   const events = await prisma.event.findMany({
     where: { status: "PUBLISHED" },
-    include: { distances: distanceWithCount },
+    include: { distances: distanceWithCount, customFieldDefs: { orderBy: { order: "asc" } } },
     orderBy: { eventDate: "asc" },
   });
   res.json(events);
@@ -26,7 +26,7 @@ router.get("/", async (_req: Request, res: Response) => {
 router.get("/:slug", async (req: Request, res: Response) => {
   const event = await prisma.event.findUnique({
     where: { slug: req.params.slug as string },
-    include: { distances: distanceWithCount },
+    include: { distances: distanceWithCount, customFieldDefs: { orderBy: { order: "asc" } } },
   });
   if (!event) {
     res.status(404).json({ error: "Event not found" });
@@ -56,6 +56,7 @@ router.get("/admin/all", requireAuth, async (req: AuthRequest, res: Response) =>
     where,
     include: {
       distances: true,
+      customFieldDefs: { orderBy: { order: "asc" } },
       _count: { select: { registrations: true } },
       createdBy: { select: { id: true, name: true } },
     },
@@ -78,6 +79,17 @@ const distanceSchema = z.object({
   memberFieldConfig: z.record(z.string(), fieldVisibilitySchema).optional().nullable(),
 });
 
+const customFieldDefSchema = z.object({
+  id: z.string().optional(),
+  label: z.string().min(1),
+  type: z.enum(["TEXT", "NUMBER", "SELECT", "CHECKBOX"]),
+  options: z.array(z.string()).optional().nullable(),
+  required: z.boolean().default(false),
+  includeInEmail: z.boolean().default(false),
+  includeInExport: z.boolean().default(false),
+  order: z.number().int().default(0),
+});
+
 const eventSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
@@ -95,6 +107,7 @@ const eventSchema = z.object({
   fieldConfig: z.record(z.string(), fieldVisibilitySchema).optional().nullable(),
   allowMultipleRegistrations: z.boolean().default(false),
   distances: z.array(distanceSchema).min(1),
+  customFieldDefs: z.array(customFieldDefSchema).optional().default([]),
 });
 
 router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
@@ -104,8 +117,8 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
     return;
   }
 
-  const { distances, ...eventData } = parsed.data;
-    const event = await prisma.event.create({
+  const { distances, customFieldDefs, ...eventData } = parsed.data;
+  const event = await prisma.event.create({
     data: {
       ...eventData,
       password: eventData.status === "PRIVATE" ? (eventData.password || null) : null,
@@ -132,8 +145,24 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
         })),
       },
     },
-    include: { distances: true },
+    include: { distances: true, customFieldDefs: { orderBy: { order: "asc" } } },
   });
+
+  if (customFieldDefs.length > 0) {
+    await prisma.customFieldDef.createMany({
+      data: customFieldDefs.map((f, i) => ({
+        eventId: event.id,
+        label: f.label,
+        type: f.type,
+        options: f.options ?? Prisma.DbNull,
+        required: f.required,
+        includeInEmail: f.includeInEmail,
+        includeInExport: f.includeInExport,
+        order: f.order ?? i,
+      })),
+    });
+  }
+
   res.status(201).json(event);
 });
 
@@ -144,7 +173,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     return;
   }
 
-  const { distances, ...eventData } = parsed.data;
+  const { distances, customFieldDefs, ...eventData } = parsed.data;
   const eventId = req.params.id as string;
 
   // EVENT_MANAGER can only edit their own events
@@ -224,8 +253,46 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       }
     }
 
-    return tx.event.findUnique({ where: { id: eventId }, include: { distances: true } });
+    return tx.event.findUnique({
+      where: { id: eventId },
+      include: { distances: true, customFieldDefs: { orderBy: { order: "asc" } } },
+    });
   });
+
+  // Upsert custom field defs: delete removed ones, upsert existing/new
+  const incomingDefIds = new Set(customFieldDefs.filter((f) => f.id).map((f) => f.id!));
+  await prisma.customFieldDef.deleteMany({
+    where: { eventId, id: { notIn: [...incomingDefIds] } },
+  });
+  for (const [i, f] of customFieldDefs.entries()) {
+    if (f.id) {
+      await prisma.customFieldDef.update({
+        where: { id: f.id },
+        data: {
+          label: f.label,
+          type: f.type,
+          options: f.options ?? Prisma.DbNull,
+          required: f.required,
+          includeInEmail: f.includeInEmail,
+          includeInExport: f.includeInExport,
+          order: f.order ?? i,
+        },
+      });
+    } else {
+      await prisma.customFieldDef.create({
+        data: {
+          eventId,
+          label: f.label,
+          type: f.type,
+          options: f.options ?? Prisma.DbNull,
+          required: f.required,
+          includeInEmail: f.includeInEmail,
+          includeInExport: f.includeInExport,
+          order: f.order ?? i,
+        },
+      });
+    }
+  }
 
   res.json(event);
 });

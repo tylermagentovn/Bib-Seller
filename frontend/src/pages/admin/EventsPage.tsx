@@ -3,14 +3,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { api, type Event, type FieldConfig, type FieldVisibility } from "@/lib/api";
+import { api, type Event, type FieldConfig, type FieldVisibility, type CustomFieldDef, type CustomFieldType } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, X, Loader2, Calendar, MapPin, Upload, Settings2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2, Calendar, MapPin, Upload, Settings2, ChevronUp, ChevronDown } from "lucide-react";
+
+type CustomFieldForm = Omit<CustomFieldDef, "eventId"> & { id?: string };
 
 const FIELD_CONFIG_ITEMS: { key: keyof FieldConfig; label: string }[] = [
   { key: "fullName", label: "Họ và tên" },
@@ -128,6 +130,7 @@ export function AdminEventsPage() {
   const [fieldConfig, setFieldConfig] = useState<FieldConfig>({ ...DEFAULT_FIELD_CONFIG });
   const [memberFieldConfigs, setMemberFieldConfigs] = useState<(FieldConfig | null)[]>([]);
   const [memberFieldModalIndex, setMemberFieldModalIndex] = useState<number | null>(null);
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldForm[]>([]);
 
   const openCreate = () => {
     reset({ status: "DRAFT", password: "", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
@@ -139,6 +142,7 @@ export function AdminEventsPage() {
     setCoverUploadedUrl("");
     setFieldConfig({ ...DEFAULT_FIELD_CONFIG });
     setMemberFieldConfigs([null]);
+    setCustomFieldDefs([]);
     setEditing(null);
     setShowForm(true);
   };
@@ -180,6 +184,16 @@ export function AdminEventsPage() {
     setMemberFieldConfigs(event.distances.map((d) =>
       d.type === "RELAY" ? { ...DEFAULT_MEMBER_FIELD_CONFIG, ...(d.memberFieldConfig ?? {}) } : null
     ));
+    setCustomFieldDefs((event.customFieldDefs ?? []).map((d) => ({
+      id: d.id,
+      label: d.label,
+      type: d.type,
+      options: d.options ?? null,
+      required: d.required,
+      includeInEmail: d.includeInEmail,
+      includeInExport: d.includeInExport,
+      order: d.order,
+    })));
     setEditing(event);
     setShowForm(true);
   };
@@ -238,6 +252,7 @@ export function AdminEventsPage() {
                   ...dist,
                   memberFieldConfig: dist.type === "RELAY" ? (memberFieldConfigs[i] ?? DEFAULT_MEMBER_FIELD_CONFIG) : null,
                 })),
+                customFieldDefs: customFieldDefs.map((f, i) => ({ ...f, order: i })),
               };
               saveMutation.mutate(payload as any);
             })} className="p-5 space-y-4">
@@ -659,6 +674,121 @@ export function AdminEventsPage() {
                         </button>
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Custom Fields */}
+              <div className="border-t pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base">Trường tùy chỉnh</Label>
+                    <p className="text-xs text-gray-400 mt-0.5">Thêm thông tin bổ sung cho form đăng ký</p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCustomFieldDefs((prev) => [...prev, {
+                      label: "",
+                      type: "TEXT" as CustomFieldType,
+                      options: null,
+                      required: false,
+                      includeInEmail: false,
+                      includeInExport: true,
+                      order: prev.length,
+                    } as CustomFieldForm])}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Thêm trường
+                  </Button>
+                </div>
+                {customFieldDefs.length === 0 && (
+                  <p className="text-xs text-gray-400 italic py-2">Chưa có trường tùy chỉnh nào.</p>
+                )}
+                {customFieldDefs.map((field, i) => (
+                  <div key={i} className="border rounded-xl p-3 bg-gray-50 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-gray-500">Trường {i + 1}</span>
+                      <div className="flex items-center gap-1">
+                        <button type="button" disabled={i === 0} onClick={() => setCustomFieldDefs((prev) => {
+                          const next = [...prev]; [next[i - 1], next[i]] = [next[i], next[i - 1]]; return next;
+                        })} className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30">
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" disabled={i === customFieldDefs.length - 1} onClick={() => setCustomFieldDefs((prev) => {
+                          const next = [...prev]; [next[i], next[i + 1]] = [next[i + 1], next[i]]; return next;
+                        })} className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30">
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => setCustomFieldDefs((prev) => prev.filter((_, idx) => idx !== i))}
+                          className="p-1 text-red-400 hover:text-red-600">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tên trường *</Label>
+                        <Input
+                          className="h-8 text-sm"
+                          placeholder="VD: Tên công ty"
+                          value={field.label}
+                          onChange={(e) => setCustomFieldDefs((prev) => {
+                            const next = [...prev]; next[i] = { ...next[i], label: e.target.value }; return next;
+                          })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Loại</Label>
+                        <Select value={field.type} onValueChange={(v) => setCustomFieldDefs((prev) => {
+                          const next = [...prev];
+                          next[i] = { ...next[i], type: v as CustomFieldType, options: (v === "SELECT" || v === "CHECKBOX") ? (next[i].options ?? []) : null };
+                          return next;
+                        })}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="TEXT">Văn bản</SelectItem>
+                            <SelectItem value="NUMBER">Số</SelectItem>
+                            <SelectItem value="SELECT">Chọn một</SelectItem>
+                            <SelectItem value="CHECKBOX">Chọn nhiều</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {(field.type === "SELECT" || field.type === "CHECKBOX") && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Các lựa chọn (mỗi dòng 1 option)</Label>
+                        <textarea
+                          className="flex w-full rounded-lg border border-input bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[60px] resize-none"
+                          placeholder={"Option 1\nOption 2\nOption 3"}
+                          value={(field.options ?? []).join("\n")}
+                          onChange={(e) => setCustomFieldDefs((prev) => {
+                            const next = [...prev];
+                            next[i] = { ...next[i], options: e.target.value.split("\n").map((s) => s.trimEnd()).filter(Boolean) };
+                            return next;
+                          })}
+                        />
+                      </div>
+                    )}
+                    <div className="flex gap-4 flex-wrap">
+                      {([
+                        { key: "required", label: "Bắt buộc" },
+                        { key: "includeInEmail", label: "Trong email" },
+                        { key: "includeInExport", label: "Trong CSV" },
+                      ] as const).map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={!!field[key]}
+                            onChange={(e) => setCustomFieldDefs((prev) => {
+                              const next = [...prev]; next[i] = { ...next[i], [key]: e.target.checked }; return next;
+                            })}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
