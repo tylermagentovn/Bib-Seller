@@ -183,10 +183,11 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
   if (isFree && registration.email) {
     const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
     const continueUrl = `${frontend.replace(/\/$/, "")}/payment/${registration.id}/success?step=waiver`;
+    // Use customFieldValues from request body (DB record created after this point)
     const emailCustomFields = (registration.event as any).customFieldDefs
       ?.filter((d: any) => d.includeInEmail)
       .map((d: any) => {
-        const cv = registration.customFieldValues?.find((v: any) => v.fieldDefId === d.id);
+        const cv = customFieldValues.find((v) => v.fieldDefId === d.id);
         const raw = cv?.value ?? "";
         let display = raw;
         try { const arr = JSON.parse(raw); if (Array.isArray(arr)) display = arr.join(", "); } catch {}
@@ -198,6 +199,19 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
       fullName: registration.fullName ?? null,
       registrationId: registration.id,
       eventName: registration.event.name,
+      distanceName: registration.distance.name,
+      eventDate: (registration.event as any).eventDate
+        ? new Date((registration.event as any).eventDate).toISOString().split("T")[0]
+        : null,
+      location: (registration.event as any).location ?? null,
+      dob: registration.dob ? registration.dob.toISOString().split("T")[0] : null,
+      phone: registration.phone ?? null,
+      idNumber: registration.idNumber ?? null,
+      shirtSize: registration.shirtSize ?? null,
+      bloodType: registration.bloodType ?? null,
+      medicalConditions: registration.medicalConditions ?? null,
+      emergencyName: registration.emergencyName ?? null,
+      emergencyPhone: registration.emergencyPhone ?? null,
       continueUrl,
       teamMembers: registration.teamMembers.length > 0 ? registration.teamMembers : undefined,
       customFields: emailCustomFields.length > 0 ? emailCustomFields : undefined,
@@ -447,6 +461,10 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     emergencyName: z.string().optional(),
     emergencyPhone: z.string().optional(),
     teamMembers: z.array(teamMemberSchema).optional(),
+    customFieldValues: z.array(z.object({
+      fieldDefId: z.string(),
+      value: z.string(),
+    })).optional(),
   });
 
   const parsed = updateSchema.safeParse(req.body);
@@ -456,7 +474,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 
   const id = req.params.id as string;
-  const { teamMembers, ...data } = parsed.data;
+  const { teamMembers, customFieldValues: cfvUpdates, ...data } = parsed.data;
 
   const registration = await prisma.registration.findUnique({
     where: { id },
@@ -505,11 +523,36 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       include: {
         payment: true,
         distance: true,
-        event: true,
+        event: { include: { customFieldDefs: { orderBy: { order: "asc" } } } },
         teamMembers: { orderBy: { memberIndex: "asc" } },
+        customFieldValues: { include: { fieldDef: true } },
       },
     });
   });
+
+  // Upsert custom field values if provided
+  if (cfvUpdates && cfvUpdates.length > 0) {
+    for (const cv of cfvUpdates) {
+      await prisma.customFieldValue.upsert({
+        where: { registrationId_fieldDefId: { registrationId: id, fieldDefId: cv.fieldDefId } },
+        create: { registrationId: id, fieldDefId: cv.fieldDefId, value: cv.value },
+        update: { value: cv.value },
+      });
+    }
+    // Re-fetch so response includes updated custom field values
+    const refreshed = await prisma.registration.findUnique({
+      where: { id },
+      include: {
+        payment: true,
+        distance: true,
+        event: { include: { customFieldDefs: { orderBy: { order: "asc" } } } },
+        teamMembers: { orderBy: { memberIndex: "asc" } },
+        customFieldValues: { include: { fieldDef: true } },
+      },
+    });
+    res.json(refreshed);
+    return;
+  }
 
   res.json(updated);
 });

@@ -136,6 +136,17 @@ interface RegistrationSuccessEmailData {
   fullName: string | null;
   registrationId: string;
   eventName: string;
+  distanceName: string;
+  eventDate?: string | null;
+  location?: string | null;
+  dob?: string | null;
+  phone?: string | null;
+  idNumber?: string | null;
+  shirtSize?: string | null;
+  bloodType?: string | null;
+  medicalConditions?: string | null;
+  emergencyName?: string | null;
+  emergencyPhone?: string | null;
   continueUrl: string;
   teamMembers?: TeamMemberEmailInfo[];
   customFields?: { label: string; value: string }[];
@@ -155,6 +166,10 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
         .header p { margin: 8px 0 0; opacity: 0.85; }
         .body { padding: 32px; }
         .btn { display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; }
+        .info-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        .info-table td { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+        .info-table td:first-child { color: #888; font-size: 14px; width: 40%; }
+        .info-table td:last-child { font-weight: 600; }
         .footer { background: #f9f9f9; padding: 24px 32px; text-align: center; color: #999; font-size: 13px; }
         .footer a { color: #6366f1; text-decoration: none; }
         .footer .brand { font-weight: 600; color: #555; margin-bottom: 6px; }
@@ -171,7 +186,21 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
         <div class="body">
           <p>Xin chào <strong>${data.fullName ?? "Bạn"}</strong>,</p>
           <p>Đăng ký của bạn đã được xác nhận. Tiếp theo, bạn cần <strong>ký bản miễn trừ trách nhiệm</strong> và <strong>quay số BIB</strong> để hoàn tất.</p>
-          <p>Mã đăng ký: <strong>#${data.registrationId.slice(-8).toUpperCase()}</strong></p>
+          <table class="info-table">
+            <tr><td>Sự kiện</td><td>${data.eventName}</td></tr>
+            <tr><td>Cự ly</td><td>${data.distanceName}</td></tr>
+            ${data.eventDate ? `<tr><td>Ngày tổ chức</td><td>${data.eventDate}</td></tr>` : ""}
+            ${data.location ? `<tr><td>Địa điểm</td><td>${data.location}</td></tr>` : ""}
+            <tr><td>Mã đăng ký</td><td>#${data.registrationId.slice(-8).toUpperCase()}</td></tr>
+            ${data.fullName ? `<tr><td>Họ tên</td><td>${data.fullName}</td></tr>` : ""}
+            ${data.dob ? `<tr><td>Ngày sinh</td><td>${data.dob}</td></tr>` : ""}
+            ${data.phone ? `<tr><td>Điện thoại</td><td>${data.phone}</td></tr>` : ""}
+            ${data.idNumber ? `<tr><td>Số CCCD</td><td>${data.idNumber}</td></tr>` : ""}
+            ${data.shirtSize ? `<tr><td>Size áo</td><td>${data.shirtSize}</td></tr>` : ""}
+            ${data.bloodType ? `<tr><td>Nhóm máu</td><td>${data.bloodType}</td></tr>` : ""}
+            ${data.medicalConditions ? `<tr><td>Bệnh lý</td><td>${data.medicalConditions}</td></tr>` : ""}
+            ${(data.emergencyName || data.emergencyPhone) ? `<tr><td>Liên hệ khẩn cấp</td><td>${[data.emergencyName, data.emergencyPhone].filter(Boolean).join(" — ")}</td></tr>` : ""}
+          </table>
           ${data.teamMembers && data.teamMembers.length > 0 ? `
           <h3 style="margin: 24px 0 12px; color: #444; font-size: 15px; border-top: 1px solid #f0f0f0; padding-top: 20px;">Thành viên nhóm</h3>
           <table style="width: 100%; border-collapse: collapse; font-size: 14px;">

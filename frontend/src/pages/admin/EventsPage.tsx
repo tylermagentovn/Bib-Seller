@@ -757,17 +757,48 @@ export function AdminEventsPage() {
                     </div>
                     {(field.type === "SELECT" || field.type === "CHECKBOX") && (
                       <div className="space-y-1">
-                        <Label className="text-xs">Các lựa chọn (mỗi dòng 1 option)</Label>
-                        <textarea
-                          className="flex w-full rounded-lg border border-input bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[60px] resize-none"
-                          placeholder={"Option 1\nOption 2\nOption 3"}
-                          value={(field.options ?? []).join("\n")}
-                          onChange={(e) => setCustomFieldDefs((prev) => {
-                            const next = [...prev];
-                            next[i] = { ...next[i], options: e.target.value.split("\n").map((s) => s.trimEnd()).filter(Boolean) };
-                            return next;
-                          })}
-                        />
+                        <Label className="text-xs">Các lựa chọn</Label>
+                        <div className="space-y-1">
+                          {(field.options ?? []).map((opt, oi) => (
+                            <div key={oi} className="flex gap-1">
+                              <Input
+                                className="h-7 text-sm"
+                                placeholder={`Option ${oi + 1}`}
+                                value={opt}
+                                onChange={(e) => setCustomFieldDefs((prev) => {
+                                  const next = [...prev];
+                                  const opts = [...(next[i].options ?? [])];
+                                  opts[oi] = e.target.value;
+                                  next[i] = { ...next[i], options: opts };
+                                  return next;
+                                })}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setCustomFieldDefs((prev) => {
+                                  const next = [...prev];
+                                  const opts = (next[i].options ?? []).filter((_, idx) => idx !== oi);
+                                  next[i] = { ...next[i], options: opts };
+                                  return next;
+                                })}
+                                className="p-1 text-red-400 hover:text-red-600 flex-shrink-0"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setCustomFieldDefs((prev) => {
+                              const next = [...prev];
+                              next[i] = { ...next[i], options: [...(next[i].options ?? []), ""] };
+                              return next;
+                            })}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-0.5"
+                          >
+                            <Plus className="h-3 w-3" /> Thêm option
+                          </button>
+                        </div>
                       </div>
                     )}
                     <div className="flex gap-4 flex-wrap">

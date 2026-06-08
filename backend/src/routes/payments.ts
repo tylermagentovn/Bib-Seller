@@ -139,6 +139,17 @@ router.post("/webhook/payos", async (req: Request, res: Response) => {
         fullName: reg.fullName ?? null,
         registrationId: reg.id,
         eventName: reg.event.name,
+        distanceName: reg.distance.name,
+        eventDate: reg.event.eventDate ? new Date(reg.event.eventDate).toISOString().split("T")[0] : null,
+        location: reg.event.location ?? null,
+        dob: reg.dob ? reg.dob.toISOString().split("T")[0] : null,
+        phone: reg.phone ?? null,
+        idNumber: reg.idNumber ?? null,
+        shirtSize: reg.shirtSize ?? null,
+        bloodType: reg.bloodType ?? null,
+        medicalConditions: reg.medicalConditions ?? null,
+        emergencyName: reg.emergencyName ?? null,
+        emergencyPhone: reg.emergencyPhone ?? null,
         continueUrl,
         teamMembers: reg.teamMembers.length > 0 ? reg.teamMembers : undefined,
       }).catch(console.error);
@@ -161,7 +172,7 @@ router.post("/dev-confirm/:registrationId", async (req: Request, res: Response) 
   const registrationId = req.params.registrationId as string;
   const payment = await prisma.payment.findUnique({
     where: { registrationId },
-    include: { registration: { include: { event: true, teamMembers: { orderBy: { memberIndex: "asc" } } } } },
+    include: { registration: { include: { event: true, distance: true, teamMembers: { orderBy: { memberIndex: "asc" } } } } },
   });
 
   if (!payment) {
@@ -194,6 +205,17 @@ router.post("/dev-confirm/:registrationId", async (req: Request, res: Response) 
       fullName: reg.fullName ?? null,
       registrationId: reg.id,
       eventName: reg.event.name,
+      distanceName: reg.distance.name,
+      eventDate: reg.event.eventDate ? new Date(reg.event.eventDate).toISOString().split("T")[0] : null,
+      location: reg.event.location ?? null,
+      dob: reg.dob ? reg.dob.toISOString().split("T")[0] : null,
+      phone: reg.phone ?? null,
+      idNumber: reg.idNumber ?? null,
+      shirtSize: reg.shirtSize ?? null,
+      bloodType: reg.bloodType ?? null,
+      medicalConditions: reg.medicalConditions ?? null,
+      emergencyName: reg.emergencyName ?? null,
+      emergencyPhone: reg.emergencyPhone ?? null,
       continueUrl,
       teamMembers: reg.teamMembers.length > 0 ? reg.teamMembers : undefined,
     }).catch(console.error);

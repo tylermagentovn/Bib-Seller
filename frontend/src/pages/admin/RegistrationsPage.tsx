@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Registration, type TeamMember } from "@/lib/api";
+import { api, type Registration, type TeamMember, type CustomFieldDef } from "@/lib/api";
 import { MEMBER_FIELD_DEFS, GENDERS, SHIRT_SIZES, BLOOD_TYPES, initFieldValue, normalizeFieldValue } from "@/lib/memberFields";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -132,6 +132,21 @@ function EditInfoModal({ reg, onClose }: {
   const fv = (key: string) => !fieldConfig || (fieldConfig as Record<string, string | undefined>)[key] !== "hidden";
   const mv = (key: string) => !memberFieldConfig || (memberFieldConfig as Record<string, string | undefined>)[key] !== "hidden";
 
+  const customDefs: CustomFieldDef[] = (reg.event as any).customFieldDefs ?? [];
+  const [customFieldState, setCustomFieldState] = useState<Record<string, string | string[]>>(() => {
+    const init: Record<string, string | string[]> = {};
+    for (const def of customDefs) {
+      const cv = reg.customFieldValues?.find((v) => v.fieldDefId === def.id);
+      const raw = cv?.value ?? "";
+      if (def.type === "CHECKBOX") {
+        try { init[def.id] = JSON.parse(raw); } catch { init[def.id] = []; }
+      } else {
+        init[def.id] = raw;
+      }
+    }
+    return init;
+  });
+
   const [teamMembers, setTeamMembers] = useState<MemberEditState[]>(
     reg.teamMembers.map((m) => ({
       fullName: m.fullName,
@@ -178,6 +193,15 @@ function EditInfoModal({ reg, onClose }: {
           MEMBER_FIELD_DEFS.map((f) => [f.key, normalizeFieldValue(f, m[f.key] ?? f.defaultValue)])
         ),
       }));
+    }
+    if (customDefs.length > 0) {
+      payload.customFieldValues = customDefs.map((def) => {
+        const val = customFieldState[def.id] ?? "";
+        return {
+          fieldDefId: def.id,
+          value: Array.isArray(val) ? JSON.stringify(val) : val,
+        };
+      });
     }
     mutation.mutate(payload);
   };
@@ -307,6 +331,72 @@ function EditInfoModal({ reg, onClose }: {
                     <Input value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {customDefs.length > 0 && (
+            <div className="border-t pt-4">
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Trường tùy chỉnh</h4>
+              <div className="space-y-3">
+                {customDefs.map((def) => (
+                  <div key={def.id}>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">
+                      {def.label}{def.required && <span className="text-red-500 ml-0.5">*</span>}
+                    </label>
+                    {def.type === "TEXT" && (
+                      <Input
+                        value={(customFieldState[def.id] as string) ?? ""}
+                        onChange={(e) => setCustomFieldState((prev) => ({ ...prev, [def.id]: e.target.value }))}
+                      />
+                    )}
+                    {def.type === "NUMBER" && (
+                      <Input
+                        type="number"
+                        value={(customFieldState[def.id] as string) ?? ""}
+                        onChange={(e) => setCustomFieldState((prev) => ({ ...prev, [def.id]: e.target.value }))}
+                      />
+                    )}
+                    {def.type === "SELECT" && (
+                      <Select
+                        value={(customFieldState[def.id] as string) || "_none_"}
+                        onValueChange={(v) => setCustomFieldState((prev) => ({ ...prev, [def.id]: v === "_none_" ? "" : v }))}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Chọn" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_none_">—</SelectItem>
+                          {(def.options ?? []).map((opt) => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {def.type === "CHECKBOX" && (
+                      <div className="flex flex-wrap gap-3">
+                        {(def.options ?? []).map((opt) => {
+                          const checked = (customFieldState[def.id] as string[] ?? []).includes(opt);
+                          return (
+                            <label key={opt} className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const isChecked = e.target.checked;
+                                  setCustomFieldState((s) => {
+                                    const prev = (s[def.id] as string[]) ?? [];
+                                    return { ...s, [def.id]: isChecked ? [...prev, opt] : prev.filter((x) => x !== opt) };
+                                  });
+                                }}
+                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              {opt}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -585,6 +675,25 @@ function DetailModal({ reg, onClose, onEditBib, onEditStatus, onEditInfo }: {
                     </div>
                   </div>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {/* Trường tùy chỉnh */}
+          {reg.customFieldValues && reg.customFieldValues.length > 0 && (
+            <section>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Trường tùy chỉnh</h3>
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                {reg.customFieldValues.map((cv) => {
+                  let display = cv.value;
+                  try { const arr = JSON.parse(cv.value); if (Array.isArray(arr)) display = arr.join(", "); } catch {}
+                  return (
+                    <div key={cv.id} className="flex justify-between gap-3">
+                      <span className="text-gray-500 flex-shrink-0">{cv.fieldDef?.label}</span>
+                      <span className="font-medium text-right break-words max-w-[60%]">{display || "—"}</span>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}
