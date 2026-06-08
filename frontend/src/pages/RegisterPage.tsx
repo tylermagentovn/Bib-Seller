@@ -215,10 +215,25 @@ export function RegisterPage() {
   const location = useLocation();
   const { user, isLoading: userLoading } = useUser();
 
-  const { data: event, isLoading: eventLoading } = useQuery<Event>({
-    queryKey: ["event", slug],
-    queryFn: () => api.get(`/events/${slug}`).then((r) => r.data),
+  const storedPassword = slug ? sessionStorage.getItem(`event-pw-${slug}`) : null;
+
+  const { data: event, isLoading: eventLoading, error: eventError } = useQuery<Event>({
+    queryKey: ["event", slug, storedPassword],
+    queryFn: () => {
+      const config = storedPassword ? { headers: { "x-event-password": storedPassword } } : {};
+      return api.get(`/events/${slug}`, config).then((r) => r.data);
+    },
+    retry: false,
   });
+
+  const eventErrCode = (eventError as any)?.response?.data?.error as string | undefined;
+
+  // Redirect to event page if private and not unlocked
+  useEffect(() => {
+    if (eventErrCode === "PRIVATE_EVENT" || eventErrCode === "WRONG_PASSWORD") {
+      navigate(`/events/${slug}`, { replace: true });
+    }
+  }, [eventErrCode, slug]);
 
   // Redirect to login if not authenticated
   useEffect(() => {

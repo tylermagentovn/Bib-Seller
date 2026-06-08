@@ -32,7 +32,21 @@ router.get("/:slug", async (req: Request, res: Response) => {
     res.status(404).json({ error: "Event not found" });
     return;
   }
-  res.json(event);
+
+  if (event.status === "PRIVATE") {
+    const providedPassword = req.headers["x-event-password"] as string | undefined;
+    if (!providedPassword) {
+      res.status(401).json({ error: "PRIVATE_EVENT", message: "Sự kiện này yêu cầu mật khẩu" });
+      return;
+    }
+    if (providedPassword !== event.password) {
+      res.status(403).json({ error: "WRONG_PASSWORD", message: "Mật khẩu không đúng" });
+      return;
+    }
+  }
+
+  const { password: _pw, ...safeEvent } = event;
+  res.json(safeEvent);
 });
 
 // Admin: list events (SUPER_ADMIN sees all, EVENT_MANAGER sees only their own)
@@ -76,7 +90,8 @@ const eventSchema = z.object({
   raceKitDescription: z.string().optional(),
   location: z.string().optional(),
   eventDate: z.string().optional(),
-  status: z.enum(["DRAFT", "PUBLISHED", "CLOSED"]).default("DRAFT"),
+  status: z.enum(["DRAFT", "PUBLISHED", "CLOSED", "PRIVATE"]).default("DRAFT"),
+  password: z.string().optional().nullable(),
   fieldConfig: z.record(z.string(), fieldVisibilitySchema).optional().nullable(),
   allowMultipleRegistrations: z.boolean().default(false),
   distances: z.array(distanceSchema).min(1),
@@ -93,6 +108,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
     const event = await prisma.event.create({
     data: {
       ...eventData,
+      password: eventData.status === "PRIVATE" ? (eventData.password || null) : null,
       eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
       imageUrl: eventData.imageUrl || null,
       shirtSizeImageUrl: eventData.shirtSizeImageUrl || null,
@@ -158,6 +174,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       where: { id: eventId },
       data: {
         ...eventData,
+        password: eventData.status === "PRIVATE" ? (eventData.password || null) : null,
         eventDate: eventData.eventDate ? new Date(eventData.eventDate) : null,
         imageUrl: eventData.imageUrl || null,
         shirtSizeImageUrl: eventData.shirtSizeImageUrl || null,

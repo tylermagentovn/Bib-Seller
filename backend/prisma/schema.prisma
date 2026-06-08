@@ -32,6 +32,7 @@ model Event {
   location    String?
   eventDate   DateTime?
   status      EventStatus @default(DRAFT)
+  password    String?
   fieldConfig                 Json?
   allowMultipleRegistrations  Boolean   @default(false)
   createdAt   DateTime    @default(now())
@@ -174,6 +175,7 @@ enum EventStatus {
   DRAFT
   PUBLISHED
   CLOSED
+  PRIVATE
 }
 
 enum RegistrationStatus {

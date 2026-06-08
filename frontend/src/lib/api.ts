@@ -12,7 +12,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    if (err.response?.status === 401 && err.response?.data?.error !== "PRIVATE_EVENT") {
       localStorage.removeItem("admin_token");
       if (window.location.pathname.startsWith("/admin") && window.location.pathname !== "/admin/login") {
         window.location.href = "/admin/login";
@@ -120,7 +120,8 @@ export interface Event {
   raceKitDescription: string | null;
   location: string | null;
   eventDate: string | null;
-  status: "DRAFT" | "PUBLISHED" | "CLOSED";
+  status: "DRAFT" | "PUBLISHED" | "CLOSED" | "PRIVATE";
+  password?: string | null;
   fieldConfig: FieldConfig | null;
   allowMultipleRegistrations: boolean;
   distances: Distance[];

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
@@ -7,16 +7,42 @@ import { useUser } from "@/contexts/UserContext";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Users, ArrowRight, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Calendar, MapPin, Users, ArrowRight, ChevronRight, AlertCircle, CheckCircle2, Lock, Loader2 } from "lucide-react";
 
 export function EventDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useUser();
 
-  const { data: event, isLoading, isError } = useQuery<Event>({
-    queryKey: ["event", slug],
-    queryFn: () => api.get(`/events/${slug}`).then((r) => r.data),
+  const [unlockedPassword, setUnlockedPassword] = useState<string | null>(() => {
+    if (!slug) return null;
+    return sessionStorage.getItem(`event-pw-${slug}`) || null;
   });
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  const { data: event, isLoading, error } = useQuery<Event>({
+    queryKey: ["event", slug, unlockedPassword],
+    queryFn: async () => {
+      const config = unlockedPassword
+        ? { headers: { "x-event-password": unlockedPassword } }
+        : {};
+      return api.get(`/events/${slug}`, config).then((r) => r.data);
+    },
+    retry: false,
+  });
+
+  const errCode = (error as any)?.response?.data?.error as string | undefined;
+
+  // If stored password is no longer valid, clear it and show dialog
+  useEffect(() => {
+    if (errCode === "WRONG_PASSWORD" && unlockedPassword) {
+      sessionStorage.removeItem(`event-pw-${slug}`);
+      setUnlockedPassword(null);
+      setPasswordError("Mật khẩu đã thay đổi. Vui lòng nhập lại.");
+    }
+  }, [errCode, unlockedPassword, slug]);
 
   const { data: userRegistrations } = useQuery<Registration[]>({
     queryKey: ["user-registrations"],
@@ -28,6 +54,27 @@ export function EventDetailPage() {
     && !event.allowMultipleRegistrations
     && userRegistrations?.some((r) => r.eventId === event.id && r.status !== "CANCELLED");
 
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordInput.trim()) return;
+    setVerifying(true);
+    setPasswordError("");
+    try {
+      await api.get(`/events/${slug}`, { headers: { "x-event-password": passwordInput.trim() } });
+      sessionStorage.setItem(`event-pw-${slug!}`, passwordInput.trim());
+      setUnlockedPassword(passwordInput.trim());
+    } catch (err: any) {
+      const code = err.response?.data?.error;
+      if (code === "WRONG_PASSWORD") {
+        setPasswordError("Mật khẩu không đúng. Vui lòng thử lại.");
+      } else {
+        setPasswordError("Có lỗi xảy ra. Vui lòng thử lại.");
+      }
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -36,7 +83,43 @@ export function EventDetailPage() {
     );
   }
 
-  if (isError || !event) {
+  // Show password gate for private events
+  if (errCode === "PRIVATE_EVENT" || errCode === "WRONG_PASSWORD") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-sm border p-8 w-full max-w-sm text-center">
+          <div className="flex justify-center mb-4">
+            <div className="bg-indigo-100 rounded-full p-4">
+              <Lock className="h-8 w-8 text-indigo-600" />
+            </div>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">Sự kiện riêng tư</h1>
+          <p className="text-sm text-gray-500 mb-6">Sự kiện này yêu cầu mật khẩu để xem thông tin và đăng ký.</p>
+          <form onSubmit={handlePasswordSubmit} className="space-y-3">
+            <Input
+              type="text"
+              placeholder="Nhập mật khẩu..."
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              autoFocus
+              className="text-center"
+            />
+            {passwordError && (
+              <p className="text-xs text-red-500">{passwordError}</p>
+            )}
+            <Button type="submit" className="w-full" disabled={verifying || !passwordInput.trim()}>
+              {verifying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Đang kiểm tra...</> : "Xác nhận"}
+            </Button>
+          </form>
+          <Button asChild variant="link" size="sm" className="mt-3 text-gray-400">
+            <Link to="/">Quay lại trang chủ</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!event) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -85,6 +168,13 @@ export function EventDetailPage() {
     return parts;
   };
 
+  const canRegister = event.status === "PUBLISHED" || event.status === "PRIVATE";
+  const statusText = event.status === "PUBLISHED" || event.status === "PRIVATE"
+    ? "Đang mở đăng ký"
+    : event.status === "CLOSED"
+    ? "Đã đóng đăng ký"
+    : "Nháp";
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Helmet>
@@ -119,7 +209,7 @@ export function EventDetailPage() {
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border">
             <Badge variant="default" className="mb-3 bg-indigo-100 text-indigo-700 border-indigo-200">
-              {event.status === "PUBLISHED" ? "Đang mở đăng ký" : event.status}
+              {statusText}
             </Badge>
             <h1 className="text-3xl font-bold text-gray-900 leading-tight">{event.name}</h1>
           </div>
@@ -147,7 +237,7 @@ export function EventDetailPage() {
                   <Link to="/account/bibs">Xem thông tin đăng ký →</Link>
                 </Button>
               </div>
-            ) : event.status === "PUBLISHED" ? (
+            ) : canRegister ? (
               <Button asChild size="lg" className="w-full">
                 <Link to={`/events/${event.slug}/register`}>
                   Đăng ký ngay <ArrowRight className="h-4 w-4" />
@@ -261,7 +351,7 @@ export function EventDetailPage() {
                     <Link to="/account/bibs">Xem thông tin đăng ký →</Link>
                   </Button>
                 </div>
-              ) : event.status === "PUBLISHED" ? (
+              ) : canRegister ? (
                 <Button asChild size="lg" className="w-full">
                   <Link to={`/events/${event.slug}/register`}>
                     Đăng ký ngay <ArrowRight className="h-4 w-4" />

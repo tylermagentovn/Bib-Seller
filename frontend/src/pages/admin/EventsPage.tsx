@@ -89,7 +89,8 @@ const eventSchema = z.object({
   raceKitDescription: z.string().optional(),
   location: z.string().optional(),
   eventDate: z.string().optional(),
-  status: z.enum(["DRAFT", "PUBLISHED", "CLOSED"]),
+  status: z.enum(["DRAFT", "PUBLISHED", "CLOSED", "PRIVATE"]),
+  password: z.string().optional(),
   allowMultipleRegistrations: z.boolean(),
   distances: z.array(distanceSchema).min(1, "Cần ít nhất 1 cự ly"),
 });
@@ -108,7 +109,7 @@ export function AdminEventsPage() {
 
   const { register, handleSubmit, control, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(eventSchema),
-    defaultValues: { status: "DRAFT", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
+    defaultValues: { status: "DRAFT", password: "", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "distances" });
@@ -129,7 +130,7 @@ export function AdminEventsPage() {
   const [memberFieldModalIndex, setMemberFieldModalIndex] = useState<number | null>(null);
 
   const openCreate = () => {
-    reset({ status: "DRAFT", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
+    reset({ status: "DRAFT", password: "", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
     setShirtSizeUrl("");
     setRaceKitUrl("");
     setCoverUrl("");
@@ -156,6 +157,7 @@ export function AdminEventsPage() {
       location: event.location ?? "",
       eventDate: event.eventDate ? event.eventDate.slice(0, 10) : "",
       status: event.status,
+      password: event.password ?? "",
       allowMultipleRegistrations: (event as any).allowMultipleRegistrations ?? false,
       distances: event.distances.map((d) => ({
         id: d.id,
@@ -201,6 +203,7 @@ export function AdminEventsPage() {
   const statusLabel = (s: string) => {
     if (s === "PUBLISHED") return { label: "Đang mở", variant: "success" as const };
     if (s === "CLOSED") return { label: "Đã đóng", variant: "secondary" as const };
+    if (s === "PRIVATE") return { label: "Riêng tư", variant: "secondary" as const };
     return { label: "Nháp", variant: "outline" as const };
   };
 
@@ -480,9 +483,21 @@ export function AdminEventsPage() {
                       <SelectItem value="DRAFT">Nháp</SelectItem>
                       <SelectItem value="PUBLISHED">Đang mở</SelectItem>
                       <SelectItem value="CLOSED">Đã đóng</SelectItem>
+                      <SelectItem value="PRIVATE">Riêng tư (có mật khẩu)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                {watch("status") === "PRIVATE" && (
+                  <div className="space-y-1.5">
+                    <Label>Mật khẩu sự kiện *</Label>
+                    <Input
+                      {...register("password")}
+                      type="text"
+                      placeholder="Nhập mật khẩu để truy cập sự kiện..."
+                    />
+                    {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label>Cho phép đăng ký nhiều lần</Label>
                   <Select
