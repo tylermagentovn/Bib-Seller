@@ -78,7 +78,9 @@ export function AdminSettingsPage() {
   });
 
   const hasConfig = admin?.hasPaymentConfig && !cleared;
-  const webhookUrl = `${window.location.origin}/api/payments/webhook/payos`;
+  const webhookUrl = admin?.id
+    ? `${window.location.origin}/api/payments/webhook/payos/${admin.id}`
+    : `${window.location.origin}/api/payments/webhook/payos`;
 
   return (
     <div className="max-w-2xl">

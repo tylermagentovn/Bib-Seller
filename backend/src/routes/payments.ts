@@ -109,16 +109,96 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
   });
 });
 
+async function processPayosWebhook(payosInstance: PayOS, body: any, res: Response) {
+  // verify() throws if signature is invalid
+  const verified = await payosInstance.webhooks.verify(body) as any;
+
+  const successCode = body?.code === "00" || verified?.code === "00";
+  if (!successCode) {
+    res.json({ success: false, reason: "Not a success event" });
+    return;
+  }
+
+  const orderCode = String(verified?.orderCode ?? body?.data?.orderCode);
+  const reference = String(verified?.reference ?? verified?.orderCode ?? body?.data?.reference ?? orderCode);
+
+  const payment = await prisma.payment.findFirst({
+    where: { payosOrderCode: orderCode, status: "PENDING" },
+    include: { registration: { include: { event: true, distance: true, teamMembers: { orderBy: { memberIndex: "asc" } } } } },
+  });
+
+  if (!payment) {
+    res.json({ success: false, reason: "Payment not found or already processed" });
+    return;
+  }
+
+  await prisma.$transaction([
+    prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: "PAID", paidAt: new Date(), payosRef: reference },
+    }),
+    prisma.registration.update({
+      where: { id: payment.registrationId },
+      data: { status: "PAID" },
+    }),
+  ]);
+
+  const reg = payment.registration;
+  if (reg.email) {
+    const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
+    const continueUrl = `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`;
+    sendRegistrationSuccessEmail({
+      to: reg.email,
+      fullName: reg.fullName ?? null,
+      registrationId: reg.id,
+      eventName: reg.event.name,
+      distanceName: reg.distance.name,
+      eventDate: reg.event.eventDate ? new Date(reg.event.eventDate).toISOString().split("T")[0] : null,
+      location: reg.event.location ?? null,
+      dob: reg.dob ? reg.dob.toISOString().split("T")[0] : null,
+      phone: reg.phone ?? null,
+      idNumber: reg.idNumber ?? null,
+      shirtSize: reg.shirtSize ?? null,
+      bloodType: reg.bloodType ?? null,
+      medicalConditions: reg.medicalConditions ?? null,
+      emergencyName: reg.emergencyName ?? null,
+      emergencyPhone: reg.emergencyPhone ?? null,
+      continueUrl,
+      teamMembers: reg.teamMembers.length > 0 ? reg.teamMembers : undefined,
+    }).catch(console.error);
+  }
+
+  res.json({ success: true });
+}
+
 // PayOS webhook — GET for URL verification by PayOS dashboard
 router.get("/webhook/payos", (_req: Request, res: Response) => {
   res.json({ success: true });
 });
+router.get("/webhook/payos/:adminId", (_req: Request, res: Response) => {
+  res.json({ success: true });
+});
 
+// Per-admin webhook: PayOS signs test calls with the admin's checksumKey,
+// so we look up admin by ID from the URL to use the correct credentials.
+router.post("/webhook/payos/:adminId", async (req: Request, res: Response) => {
+  try {
+    const admin = await prisma.admin.findUnique({
+      where: { id: String(req.params.adminId) },
+      select: { payosClientId: true, payosApiKey: true, payosChecksumKey: true },
+    });
+    const payosInstance = getPayosInstance(admin);
+    await processPayosWebhook(payosInstance, req.body, res);
+  } catch (err) {
+    console.error("PayOS webhook error:", err);
+    res.status(400).json({ success: false, error: "Invalid webhook data" });
+  }
+});
+
+// Generic webhook (backward compat) — resolves admin via orderCode
 router.post("/webhook/payos", async (req: Request, res: Response) => {
   try {
-    // Extract orderCode from unverified body to look up which admin's credentials to use
     const rawOrderCode = String(req.body?.data?.orderCode ?? req.body?.orderCode ?? "");
-
     let payosInstance = payos;
     if (rawOrderCode) {
       const existing = await prisma.payment.findFirst({
@@ -135,67 +215,7 @@ router.post("/webhook/payos", async (req: Request, res: Response) => {
       });
       payosInstance = getPayosInstance(existing?.registration?.event?.createdBy);
     }
-
-    // verify() throws if signature is invalid, returns verified data if valid
-    const verified = await payosInstance.webhooks.verify(req.body) as any;
-
-    // code "00" means successful payment — check both outer body and verified data
-    const successCode = req.body?.code === "00" || verified?.code === "00";
-    if (!successCode) {
-      res.json({ success: false, reason: "Not a success event" });
-      return;
-    }
-
-    const orderCode = String(verified?.orderCode ?? req.body?.data?.orderCode);
-    const reference = String(verified?.reference ?? verified?.orderCode ?? req.body?.data?.reference ?? orderCode);
-
-    const payment = await prisma.payment.findFirst({
-      where: { payosOrderCode: orderCode, status: "PENDING" },
-      include: { registration: { include: { event: true, distance: true, teamMembers: { orderBy: { memberIndex: "asc" } } } } },
-    });
-
-    if (!payment) {
-      res.json({ success: false, reason: "Payment not found or already processed" });
-      return;
-    }
-
-    await prisma.$transaction([
-      prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: "PAID", paidAt: new Date(), payosRef: reference },
-      }),
-      prisma.registration.update({
-        where: { id: payment.registrationId },
-        data: { status: "PAID" },
-      }),
-    ]);
-
-    const reg = payment.registration;
-    if (reg.email) {
-      const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
-      const continueUrl = `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`;
-      sendRegistrationSuccessEmail({
-        to: reg.email,
-        fullName: reg.fullName ?? null,
-        registrationId: reg.id,
-        eventName: reg.event.name,
-        distanceName: reg.distance.name,
-        eventDate: reg.event.eventDate ? new Date(reg.event.eventDate).toISOString().split("T")[0] : null,
-        location: reg.event.location ?? null,
-        dob: reg.dob ? reg.dob.toISOString().split("T")[0] : null,
-        phone: reg.phone ?? null,
-        idNumber: reg.idNumber ?? null,
-        shirtSize: reg.shirtSize ?? null,
-        bloodType: reg.bloodType ?? null,
-        medicalConditions: reg.medicalConditions ?? null,
-        emergencyName: reg.emergencyName ?? null,
-        emergencyPhone: reg.emergencyPhone ?? null,
-        continueUrl,
-        teamMembers: reg.teamMembers.length > 0 ? reg.teamMembers : undefined,
-      }).catch(console.error);
-    }
-
-    res.json({ success: true });
+    await processPayosWebhook(payosInstance, req.body, res);
   } catch (err) {
     console.error("PayOS webhook error:", err);
     res.status(400).json({ success: false, error: "Invalid webhook data" });
