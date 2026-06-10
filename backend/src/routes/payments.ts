@@ -18,6 +18,34 @@ function getPayosInstance(admin: { payosClientId: string | null; payosApiKey: st
   return payos;
 }
 
+// Parse EMVCo TLV QR string to extract the actual transfer content (tag 62, sub-tag 08)
+function parseQrTransferContent(qr: string): string | null {
+  try {
+    let i = 0;
+    while (i + 4 <= qr.length) {
+      const tag = qr.slice(i, i + 2);
+      const len = parseInt(qr.slice(i + 2, i + 4), 10);
+      if (isNaN(len)) break;
+      const value = qr.slice(i + 4, i + 4 + len);
+      if (tag === "62") {
+        let j = 0;
+        while (j + 4 <= value.length) {
+          const subTag = value.slice(j, j + 2);
+          const subLen = parseInt(value.slice(j + 2, j + 4), 10);
+          if (isNaN(subLen)) break;
+          const subValue = value.slice(j + 4, j + 4 + subLen);
+          if (subTag === "08") return subValue;
+          j += 4 + subLen;
+        }
+      }
+      i += 4 + len;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return null;
+}
+
 const router = Router();
 
 // Get payment info + create PayOS checkout link if needed
@@ -47,7 +75,7 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
       bankBin: payment.bankBin,
       bankAccountNumber: payment.bankAccountNumber,
       bankAccountName: payment.bankAccountName,
-      description: `BIB${registrationId.slice(-6).toUpperCase()}`,
+      description: (payment.qrCode ? parseQrTransferContent(payment.qrCode) : null) ?? `BIB${registrationId.slice(-6).toUpperCase()}`,
     });
     return;
   }
@@ -61,7 +89,7 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
       bankBin: payment.bankBin,
       bankAccountNumber: payment.bankAccountNumber,
       bankAccountName: payment.bankAccountName,
-      description: `BIB${registrationId.slice(-6).toUpperCase()}`,
+      description: (payment.qrCode ? parseQrTransferContent(payment.qrCode) : null) ?? `BIB${registrationId.slice(-6).toUpperCase()}`,
     });
     return;
   }
@@ -105,7 +133,7 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
     bankBin: bankBin ?? null,
     bankAccountNumber: bankAccountNumber ?? null,
     bankAccountName: bankAccountName ?? null,
-    description,
+    description: (qrCode ? parseQrTransferContent(qrCode) : null) ?? description,
   });
 });
 
