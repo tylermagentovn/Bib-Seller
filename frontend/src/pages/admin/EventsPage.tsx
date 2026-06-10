@@ -4,6 +4,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { api, type Event, type FieldConfig, type FieldVisibility, type CustomFieldDef, type CustomFieldType } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,12 +95,14 @@ const eventSchema = z.object({
   status: z.enum(["DRAFT", "PUBLISHED", "CLOSED", "PRIVATE"]),
   password: z.string().optional(),
   allowMultipleRegistrations: z.boolean(),
+  allowGuestRegistration: z.boolean(),
   distances: z.array(distanceSchema).min(1, "Cần ít nhất 1 cự ly"),
 });
 
 type FormData = z.infer<typeof eventSchema>;
 
 export function AdminEventsPage() {
+  const { isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Event | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -111,7 +114,7 @@ export function AdminEventsPage() {
 
   const { register, handleSubmit, control, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(eventSchema),
-    defaultValues: { status: "DRAFT", password: "", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
+    defaultValues: { status: "DRAFT", password: "", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", allowMultipleRegistrations: false, allowGuestRegistration: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "distances" });
@@ -133,7 +136,7 @@ export function AdminEventsPage() {
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldForm[]>([]);
 
   const openCreate = () => {
-    reset({ status: "DRAFT", password: "", raceKitDescription: "", allowMultipleRegistrations: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
+    reset({ status: "DRAFT", password: "", raceKitDescription: "", allowMultipleRegistrations: false, allowGuestRegistration: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
     setShirtSizeUrl("");
     setRaceKitUrl("");
     setCoverUrl("");
@@ -163,6 +166,7 @@ export function AdminEventsPage() {
       status: event.status,
       password: event.password ?? "",
       allowMultipleRegistrations: (event as any).allowMultipleRegistrations ?? false,
+      allowGuestRegistration: (event as any).allowGuestRegistration ?? false,
       distances: event.distances.map((d) => ({
         id: d.id,
         name: d.name,
@@ -526,6 +530,21 @@ export function AdminEventsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {isSuperAdmin && (
+                  <div className="space-y-1.5">
+                    <Label>Cho phép đăng ký không cần đăng nhập</Label>
+                    <Select
+                      value={watch("allowGuestRegistration") ? "yes" : "no"}
+                      onValueChange={(v) => setValue("allowGuestRegistration", v === "yes")}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="no">Không — yêu cầu đăng nhập</SelectItem>
+                        <SelectItem value="yes">Có — cho phép đăng ký khách</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               {/* Field config */}

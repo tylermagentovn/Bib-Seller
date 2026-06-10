@@ -106,6 +106,7 @@ const eventSchema = z.object({
   password: z.string().optional().nullable(),
   fieldConfig: z.record(z.string(), fieldVisibilitySchema).optional().nullable(),
   allowMultipleRegistrations: z.boolean().default(false),
+  allowGuestRegistration: z.boolean().default(false),
   distances: z.array(distanceSchema).min(1),
   customFieldDefs: z.array(customFieldDefSchema).optional().default([]),
 });

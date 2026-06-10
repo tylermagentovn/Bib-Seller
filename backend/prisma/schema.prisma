@@ -39,6 +39,7 @@ model Event {
   password    String?
   fieldConfig                 Json?
   allowMultipleRegistrations  Boolean   @default(false)
+  allowGuestRegistration      Boolean   @default(false)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   createdById String?

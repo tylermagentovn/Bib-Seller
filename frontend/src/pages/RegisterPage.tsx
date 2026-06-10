@@ -235,12 +235,12 @@ export function RegisterPage() {
     }
   }, [eventErrCode, slug]);
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated and event doesn't allow guest registration
   useEffect(() => {
-    if (!userLoading && !user) {
+    if (!userLoading && !user && event && !event.allowGuestRegistration) {
       navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`, { replace: true });
     }
-  }, [user, userLoading]);
+  }, [user, userLoading, event]);
 
   if (userLoading || eventLoading) {
     return (
@@ -250,13 +250,15 @@ export function RegisterPage() {
     );
   }
 
-  if (!event || !user) return null;
+  if (!event) return null;
+  if (!event.allowGuestRegistration && !user) return null;
 
-  return <RegisterForm event={event} user={user} />;
+  return <RegisterForm event={event} user={user ?? null} />;
 }
 
-function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api").User }) {
+function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api").User | null }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const cfg = (event.fieldConfig as FieldConfig) ?? {};
   const show = (key: keyof FieldConfig) => vis(cfg, key) !== "hidden";
   const isReq = (key: keyof FieldConfig) => vis(cfg, key) === "required";
@@ -293,7 +295,7 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
   // Auto-fill from user profile (once on mount)
   const autoFilled = useRef(false);
   useEffect(() => {
-    if (autoFilled.current) return;
+    if (autoFilled.current || !user) return;
     autoFilled.current = true;
     if (user.fullName) setValue("fullName", user.fullName);
     if (user.phone) setValue("phone", user.phone);
@@ -393,6 +395,15 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
         <div className="bg-white rounded-2xl shadow-sm border p-6 md:p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">{event.name}</h1>
           <p className="text-gray-500 text-sm mb-6">Điền thông tin đăng ký tham gia sự kiện</p>
+
+          {!user && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-700 mb-4">
+              <Link to={`/login?redirect=${encodeURIComponent(location.pathname)}`} className="font-medium underline">
+                Đăng nhập
+              </Link>{" "}
+              để tự động điền thông tin và theo dõi đơn đăng ký của bạn.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Distance */}

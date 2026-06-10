@@ -146,6 +146,7 @@ export interface Event {
   password?: string | null;
   fieldConfig: FieldConfig | null;
   allowMultipleRegistrations: boolean;
+  allowGuestRegistration: boolean;
   distances: Distance[];
   customFieldDefs?: CustomFieldDef[];
   createdAt: string;
