@@ -109,7 +109,11 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
   });
 });
 
-// PayOS webhook
+// PayOS webhook — GET for URL verification by PayOS dashboard
+router.get("/webhook/payos", (_req: Request, res: Response) => {
+  res.json({ success: true });
+});
+
 router.post("/webhook/payos", async (req: Request, res: Response) => {
   try {
     // Extract orderCode from unverified body to look up which admin's credentials to use
