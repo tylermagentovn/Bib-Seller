@@ -98,7 +98,7 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
   const payosInstance = getPayosInstance(payment.registration.event.createdBy);
   const orderCode = Date.now();
   const description = `BIB${registrationId.slice(-6).toUpperCase()}`;
-  const frontendUrl = process.env.FRONTEND_URL ?? "https://songngu.info";
+  const frontendUrl = process.env.FRONTEND_URL ?? "https://bib1s.com";
 
   const payosRes = await payosInstance.paymentRequests.create({
     orderCode,
