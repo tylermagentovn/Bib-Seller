@@ -1,6 +1,6 @@
 import { Navigate, Outlet, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { LayoutDashboard, Calendar, Users, LogOut, Loader2, ShieldCheck, UserCog } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, LogOut, Loader2, ShieldCheck, UserCog, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Bib1sLogo } from "./Bib1sLogo";
 
@@ -23,6 +23,7 @@ export function AdminLayout() {
     { icon: Calendar, label: "Sự kiện", path: "/admin/events" },
     { icon: Users, label: "Đăng ký", path: "/admin/registrations" },
     ...(isSuperAdmin ? [{ icon: UserCog, label: "Tài khoản", path: "/admin/accounts" }] : []),
+    { icon: Settings, label: "Cài đặt", path: "/admin/settings" },
   ];
 
   return (

@@ -8,6 +8,7 @@ interface Admin {
   email: string;
   name: string;
   role: AdminRole;
+  hasPaymentConfig?: boolean;
 }
 
 interface AuthContextValue {

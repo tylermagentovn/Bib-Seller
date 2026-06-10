@@ -44,13 +44,13 @@ router.post("/login", async (req: Request, res: Response) => {
 router.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
   const admin = await prisma.admin.findUnique({
     where: { id: req.adminId },
-    select: { id: true, email: true, name: true, role: true },
+    select: { id: true, email: true, name: true, role: true, payosClientId: true },
   });
   if (!admin) {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  res.json(admin);
+  res.json({ ...admin, hasPaymentConfig: !!admin.payosClientId, payosClientId: undefined });
 });
 
 const createAdminSchema = z.object({
@@ -86,10 +86,10 @@ router.post("/admins", requireSuperAdmin, async (req: AuthRequest, res: Response
 // Only SUPER_ADMIN can list all accounts
 router.get("/admins", requireSuperAdmin, async (_req: AuthRequest, res: Response) => {
   const admins = await prisma.admin.findMany({
-    select: { id: true, email: true, name: true, role: true, createdAt: true },
+    select: { id: true, email: true, name: true, role: true, createdAt: true, payosClientId: true },
     orderBy: { createdAt: "desc" },
   });
-  res.json(admins);
+  res.json(admins.map((a) => ({ ...a, hasPaymentConfig: !!a.payosClientId, payosClientId: undefined })));
 });
 
 // Only SUPER_ADMIN can delete accounts
@@ -121,6 +121,60 @@ router.patch("/admins/:id/role", requireSuperAdmin, async (req: AuthRequest, res
     select: { id: true, email: true, name: true, role: true },
   });
   res.json(admin);
+});
+
+const paymentConfigSchema = z.object({
+  clientId: z.string().min(1),
+  apiKey: z.string().min(1),
+  checksumKey: z.string().min(1),
+});
+
+// Any admin can set their own payment config
+router.put("/me/payment-config", requireAuth, async (req: AuthRequest, res: Response) => {
+  const parsed = paymentConfigSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const { clientId, apiKey, checksumKey } = parsed.data;
+  await prisma.admin.update({
+    where: { id: req.adminId },
+    data: { payosClientId: clientId, payosApiKey: apiKey, payosChecksumKey: checksumKey },
+  });
+  res.json({ success: true });
+});
+
+// Any admin can clear their own payment config
+router.delete("/me/payment-config", requireAuth, async (req: AuthRequest, res: Response) => {
+  await prisma.admin.update({
+    where: { id: req.adminId },
+    data: { payosClientId: null, payosApiKey: null, payosChecksumKey: null },
+  });
+  res.status(204).send();
+});
+
+// SUPER_ADMIN can set payment config for any admin
+router.put("/admins/:id/payment-config", requireSuperAdmin, async (req: AuthRequest, res: Response) => {
+  const parsed = paymentConfigSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const { clientId, apiKey, checksumKey } = parsed.data;
+  await prisma.admin.update({
+    where: { id: req.params.id as string },
+    data: { payosClientId: clientId, payosApiKey: apiKey, payosChecksumKey: checksumKey },
+  });
+  res.json({ success: true });
+});
+
+// SUPER_ADMIN can clear payment config for any admin
+router.delete("/admins/:id/payment-config", requireSuperAdmin, async (req: AuthRequest, res: Response) => {
+  await prisma.admin.update({
+    where: { id: req.params.id as string },
+    data: { payosClientId: null, payosApiKey: null, payosChecksumKey: null },
+  });
+  res.status(204).send();
 });
 
 export default router;

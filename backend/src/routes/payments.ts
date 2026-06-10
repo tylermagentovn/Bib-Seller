@@ -4,11 +4,19 @@ import { prisma } from "../lib/prisma";
 import { sendConfirmationEmail, sendRegistrationSuccessEmail } from "../services/email";
 import { updateBibInSheet } from "../services/sheets";
 
+// Global fallback PayOS instance using env vars
 const payos = new PayOS({
   clientId: process.env.PAYOS_CLIENT_ID!,
   apiKey: process.env.PAYOS_API_KEY!,
   checksumKey: process.env.PAYOS_CHECKSUM_KEY!,
 });
+
+function getPayosInstance(admin: { payosClientId: string | null; payosApiKey: string | null; payosChecksumKey: string | null } | null | undefined): PayOS {
+  if (admin?.payosClientId && admin?.payosApiKey && admin?.payosChecksumKey) {
+    return new PayOS({ clientId: admin.payosClientId, apiKey: admin.payosApiKey, checksumKey: admin.payosChecksumKey });
+  }
+  return payos;
+}
 
 const router = Router();
 
@@ -17,7 +25,14 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
   const registrationId = req.params.registrationId as string;
   const payment = await prisma.payment.findUnique({
     where: { registrationId },
-    include: { registration: { include: { event: true, distance: true } } },
+    include: {
+      registration: {
+        include: {
+          event: { include: { createdBy: { select: { payosClientId: true, payosApiKey: true, payosChecksumKey: true } } } },
+          distance: true,
+        },
+      },
+    },
   });
   if (!payment) {
     res.status(404).json({ error: "Payment not found" });
@@ -51,12 +66,13 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
     return;
   }
 
-  // Create PayOS payment link
+  // Create PayOS payment link using event's admin credentials (or fallback)
+  const payosInstance = getPayosInstance(payment.registration.event.createdBy);
   const orderCode = Date.now();
   const description = `BIB${registrationId.slice(-6).toUpperCase()}`;
   const frontendUrl = process.env.FRONTEND_URL ?? "https://songngu.info";
 
-  const payosRes = await payos.paymentRequests.create({
+  const payosRes = await payosInstance.paymentRequests.create({
     orderCode,
     amount: payment.amount,
     description,
@@ -96,8 +112,28 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
 // PayOS webhook
 router.post("/webhook/payos", async (req: Request, res: Response) => {
   try {
+    // Extract orderCode from unverified body to look up which admin's credentials to use
+    const rawOrderCode = String(req.body?.data?.orderCode ?? req.body?.orderCode ?? "");
+
+    let payosInstance = payos;
+    if (rawOrderCode) {
+      const existing = await prisma.payment.findFirst({
+        where: { payosOrderCode: rawOrderCode },
+        select: {
+          registration: {
+            select: {
+              event: {
+                select: { createdBy: { select: { payosClientId: true, payosApiKey: true, payosChecksumKey: true } } },
+              },
+            },
+          },
+        },
+      });
+      payosInstance = getPayosInstance(existing?.registration?.event?.createdBy);
+    }
+
     // verify() throws if signature is invalid, returns verified data if valid
-    const verified = await payos.webhooks.verify(req.body) as any;
+    const verified = await payosInstance.webhooks.verify(req.body) as any;
 
     // code "00" means successful payment — check both outer body and verified data
     const successCode = req.body?.code === "00" || verified?.code === "00";

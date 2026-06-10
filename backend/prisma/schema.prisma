@@ -15,6 +15,10 @@ model Admin {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  payosClientId    String?
+  payosApiKey      String?
+  payosChecksumKey String?
+
   events Event[]
 }
 
