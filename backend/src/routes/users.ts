@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
@@ -191,9 +192,11 @@ router.post("/auth/facebook", async (req: Request, res: Response) => {
     res.status(400).json({ error: "Thiếu accessToken" });
     return;
   }
+  const appSecret = process.env.FACEBOOK_APP_SECRET ?? "";
+  const appsecretProof = crypto.createHmac("sha256", appSecret).update(accessToken).digest("hex");
   let fbUser: { id?: string; email?: string; name?: string };
   try {
-    const r = await fetch(`https://graph.facebook.com/me?fields=id,name,email&access_token=${encodeURIComponent(accessToken)}`);
+    const r = await fetch(`https://graph.facebook.com/me?fields=id,name,email&access_token=${encodeURIComponent(accessToken)}&appsecret_proof=${appsecretProof}`);
     if (!r.ok) throw new Error("invalid token");
     fbUser = (await r.json()) as { id?: string; email?: string; name?: string };
   } catch {

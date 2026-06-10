@@ -69,8 +69,6 @@ function PublicLayout() {
           <Link to="/privacy" className="hover:text-gray-600 hover:underline">Chính sách Bảo mật</Link>
           <span>·</span>
           <Link to="/terms" className="hover:text-gray-600 hover:underline">Điều khoản Sử dụng</Link>
-          <span>·</span>
-          <Link to="/data-deletion" className="hover:text-gray-600 hover:underline">Xóa Dữ liệu</Link>
         </div>
         <div>Copyright by Bib1s 2026</div>
       </footer>
