@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { UserProvider, useUser } from "@/contexts/UserContext";
@@ -16,6 +16,10 @@ import { UserRegisterPage } from "@/pages/UserRegisterPage";
 import { BibsPage } from "@/pages/account/BibsPage";
 import { ProfilePage } from "@/pages/account/ProfilePage";
 import { UnsubscribePage } from "@/pages/UnsubscribePage";
+import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
+import { TermsPage } from "@/pages/TermsPage";
+import { DataDeletionPage } from "@/pages/DataDeletionPage";
+import { NotFoundPage } from "@/pages/NotFoundPage";
 
 import { AdminLoginPage } from "@/pages/admin/LoginPage";
 import { AdminDashboardPage } from "@/pages/admin/DashboardPage";
@@ -54,10 +58,21 @@ function PublicLayout() {
           <Route path="/account/bibs" element={<RequireUser><BibsPage /></RequireUser>} />
           <Route path="/account/profile" element={<RequireUser><ProfilePage /></RequireUser>} />
           <Route path="/unsubscribe" element={<UnsubscribePage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/data-deletion" element={<DataDeletionPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </div>
-      <footer className="bg-white border-t py-4 text-center text-xs text-gray-400">
-        Copyright by Bib1s 2026
+      <footer className="bg-white border-t py-5 text-center text-xs text-gray-400 space-y-2">
+        <div className="flex justify-center gap-4">
+          <Link to="/privacy" className="hover:text-gray-600 hover:underline">Chính sách Bảo mật</Link>
+          <span>·</span>
+          <Link to="/terms" className="hover:text-gray-600 hover:underline">Điều khoản Sử dụng</Link>
+          <span>·</span>
+          <Link to="/data-deletion" className="hover:text-gray-600 hover:underline">Xóa Dữ liệu</Link>
+        </div>
+        <div>Copyright by Bib1s 2026</div>
       </footer>
     </div>
   );

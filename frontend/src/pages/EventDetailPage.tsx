@@ -135,8 +135,8 @@ export function EventDetailPage() {
 
   const pageTitle = `${event.name} — Bib1s - Nền tảng đăng ký BIB giải đấu miễn phí`;
   const pageDescription = event.description.slice(0, 160);
-  const pageImage = event.imageUrl || "https://songngu.info/banner.jpg";
-  const pageUrl = `https://songngu.info/events/${event.slug}`;
+  const pageImage = event.imageUrl || "https://bib1s.com/banner.jpg";
+  const pageUrl = `https://bib1s.com/events/${event.slug}`;
 
   // Convert plain text URLs into anchor elements while preserving whitespace
   const linkify = (text: string) => {

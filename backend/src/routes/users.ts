@@ -124,14 +124,15 @@ router.post("/login", async (req: Request, res: Response) => {
     return;
   }
   if (!user.password) {
-    res.status(401).json({ error: "Tài khoản này đăng nhập bằng Google. Vui lòng dùng nút 'Đăng nhập với Google'." });
+    const via = user.googleId ? "Google" : user.facebookId ? "Facebook" : "mạng xã hội";
+    res.status(401).json({ error: `Tài khoản này đăng nhập bằng ${via}. Vui lòng dùng nút đăng nhập tương ứng.` });
     return;
   }
   if (!(await bcrypt.compare(password, user.password))) {
     res.status(401).json({ error: "Email hoặc mật khẩu không đúng" });
     return;
   }
-  const { password: _pw, googleId: _gid, ...userData } = user;
+  const { password: _pw, googleId: _gid, facebookId: _fbid, ...userData } = user;
   const token = makeToken(user.id);
   res.json({ token, user: { ...userData, hasPassword: true } });
 });
@@ -178,7 +179,50 @@ router.post("/auth/google", async (req: Request, res: Response) => {
     });
   }
 
-  const { password: _pw, googleId: _gid, ...userData } = user;
+  const { password: _pw, googleId: _gid, facebookId: _fbid, ...userData } = user;
+  const token = makeToken(user.id);
+  res.json({ token, user: { ...userData, hasPassword: !!_pw } });
+});
+
+// POST /users/auth/facebook
+router.post("/auth/facebook", async (req: Request, res: Response) => {
+  const { accessToken } = req.body;
+  if (!accessToken || typeof accessToken !== "string") {
+    res.status(400).json({ error: "Thiếu accessToken" });
+    return;
+  }
+  let fbUser: { id?: string; email?: string; name?: string };
+  try {
+    const r = await fetch(`https://graph.facebook.com/me?fields=id,name,email&access_token=${encodeURIComponent(accessToken)}`);
+    if (!r.ok) throw new Error("invalid token");
+    fbUser = (await r.json()) as { id?: string; email?: string; name?: string };
+  } catch {
+    res.status(401).json({ error: "Token Facebook không hợp lệ" });
+    return;
+  }
+  if (!fbUser.id) {
+    res.status(401).json({ error: "Không lấy được thông tin từ Facebook" });
+    return;
+  }
+  const { id: facebookId, email, name: fullName } = fbUser;
+
+  let user = await prisma.user.findFirst({
+    where: email ? { OR: [{ facebookId }, { email }] } : { facebookId },
+  });
+
+  if (user) {
+    if (!user.facebookId) {
+      user = await prisma.user.update({ where: { id: user.id }, data: { facebookId } });
+    }
+  } else {
+    if (!email) {
+      res.status(400).json({ error: "Tài khoản Facebook không có email. Vui lòng đăng ký bằng email." });
+      return;
+    }
+    user = await prisma.user.create({ data: { email, facebookId, fullName: fullName ?? null } });
+  }
+
+  const { password: _pw, googleId: _gid, facebookId: _fbid, ...userData } = user;
   const token = makeToken(user.id);
   res.json({ token, user: { ...userData, hasPassword: !!_pw } });
 });

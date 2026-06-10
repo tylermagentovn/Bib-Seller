@@ -18,10 +18,10 @@ export function HomePage() {
       <Helmet>
         <title>Bib1s - Nền tảng đăng ký BIB giải đấu miễn phí.</title>
         <meta name="description" content="Nền tảng đăng ký BIB giải đấu miễn phí" />
-        <meta property="og:url" content="https://songngu.info/" />
+        <meta property="og:url" content="https://bib1s.com/" />
         <meta property="og:title" content="Nền tảng đăng ký BIB giải đấu miễn phí" />
         <meta property="og:description" content="Nền tảng đăng ký BIB giải đấu miễn phí" />
-        <meta property="og:image" content="https://songngu.info/banner.jpg" />
+        <meta property="og:image" content="https://bib1s.com/banner.jpg" />
       </Helmet>
       {/* Hero */}
       <section
