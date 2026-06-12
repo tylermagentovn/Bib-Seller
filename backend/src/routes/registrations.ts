@@ -8,6 +8,12 @@ import { sendRegistrationSuccessEmail } from "../services/email";
 
 const router = Router();
 
+function safeDateStr(d: Date | null | undefined): string | null {
+  if (!d) return null;
+  const t = d instanceof Date ? d.getTime() : NaN;
+  return isNaN(t) ? null : d.toISOString().split("T")[0];
+}
+
 const teamMemberSchema = z.object({
   fullName: z.string().min(1),
   phone: z.string().optional().default(""),
@@ -204,7 +210,7 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
         ? new Date((registration.event as any).eventDate).toISOString().split("T")[0]
         : null,
       location: (registration.event as any).location ?? null,
-      dob: registration.dob ? registration.dob.toISOString().split("T")[0] : null,
+      dob: safeDateStr(registration.dob),
       phone: registration.phone ?? null,
       idNumber: registration.idNumber ?? null,
       shirtSize: registration.shirtSize ?? null,
@@ -224,7 +230,7 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
     fullName: registration.fullName ?? "",
     phone: registration.phone ?? "",
     email: registration.email ?? "",
-    dob: registration.dob ? registration.dob.toISOString().split("T")[0] : "",
+    dob: safeDateStr(registration.dob) ?? "",
     eventName: registration.event.name,
     distanceName: registration.distance.name,
     bibNumber: null,
@@ -318,7 +324,7 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
           `${m.memberIndex}.${m.fullName}`,
           m.phone,
           m.gender ?? "",
-          m.dob ? m.dob.toISOString().split("T")[0] : "",
+          safeDateStr(m.dob) ?? "",
           m.idNumber ?? "",
           m.shirtSize ?? "",
           m.bloodType ?? "",
@@ -339,7 +345,7 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
       r.id,
       r.fullName ?? "",
       r.gender ?? "",
-      r.dob ? r.dob.toISOString().split("T")[0] : "",
+      safeDateStr(r.dob) ?? "",
       r.phone ?? "",
       r.email ?? "",
       r.idNumber ?? "",
