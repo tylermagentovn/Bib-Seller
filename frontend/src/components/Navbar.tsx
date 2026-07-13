@@ -51,6 +51,9 @@ export function Navbar() {
           <Link to="/" className="px-3 py-1.5 rounded-lg hover:bg-gray-100 hover:text-indigo-600 transition-colors">
             Sự kiện
           </Link>
+          <a href="https://photo.bib1s.com" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg hover:bg-gray-100 hover:text-indigo-600 transition-colors">
+            Tìm ảnh sự kiện
+          </a>
 
           {user ? (
             <>
@@ -141,6 +144,14 @@ export function Navbar() {
                 >
                   Sự kiện
                 </Link>
+                <a
+                  href="https://photo.bib1s.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Tìm ảnh sự kiện
+                </a>
                 <Link
                   to="/account/bibs"
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -171,6 +182,14 @@ export function Navbar() {
                 >
                   Sự kiện
                 </Link>
+                <a
+                  href="https://photo.bib1s.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Tìm ảnh sự kiện
+                </a>
                 <Link
                   to="/login"
                   className="flex items-center px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors"
