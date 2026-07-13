@@ -325,7 +325,6 @@ export function EventDetailPage() {
                   </div>
                   <div className="text-right">
                     <div className="font-semibold text-indigo-600">{formatCurrency(d.price)}</div>
-                    <div className="text-xs text-gray-400">{d.maxSlots} suất</div>
                   </div>
                 </div>
               ))}
