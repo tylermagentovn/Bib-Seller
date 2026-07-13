@@ -321,7 +321,6 @@ export function EventDetailPage() {
                 <div key={d.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                   <div>
                     <span className="font-medium text-gray-900">{d.name}</span>
-                    <span className="text-xs text-gray-400 ml-2">BIB #{d.bibStart}–{d.bibEnd}</span>
                   </div>
                   <div className="text-right">
                     <div className="font-semibold text-indigo-600">{formatCurrency(d.price)}</div>
