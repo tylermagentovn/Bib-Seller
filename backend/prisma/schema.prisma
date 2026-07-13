@@ -40,8 +40,8 @@ model Event {
   fieldConfig                 Json?
   allowMultipleRegistrations  Boolean   @default(false)
   allowGuestRegistration      Boolean   @default(false)
-  requireDisclaimer           Boolean   @default(true)
-  requireBibSpin              Boolean   @default(true)
+  requireDisclaimer           Boolean   @default(false)
+  requireBibSpin              Boolean   @default(false)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   createdById String?

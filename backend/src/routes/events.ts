@@ -107,8 +107,8 @@ const eventSchema = z.object({
   fieldConfig: z.record(z.string(), fieldVisibilitySchema).optional().nullable(),
   allowMultipleRegistrations: z.boolean().default(false),
   allowGuestRegistration: z.boolean().default(false),
-  requireDisclaimer: z.boolean().default(true),
-  requireBibSpin: z.boolean().default(true),
+  requireDisclaimer: z.boolean().default(false),
+  requireBibSpin: z.boolean().default(false),
   distances: z.array(distanceSchema).min(1),
   customFieldDefs: z.array(customFieldDefSchema).optional().default([]),
 });

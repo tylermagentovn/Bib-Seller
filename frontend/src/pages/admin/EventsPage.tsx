@@ -125,7 +125,7 @@ export function AdminEventsPage() {
 
   const { register, handleSubmit, control, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(eventSchema),
-    defaultValues: { status: "DRAFT", password: "", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", allowMultipleRegistrations: false, allowGuestRegistration: false, requireDisclaimer: true, requireBibSpin: true, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
+    defaultValues: { status: "DRAFT", password: "", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", allowMultipleRegistrations: false, allowGuestRegistration: false, requireDisclaimer: false, requireBibSpin: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "distances" });
@@ -147,7 +147,7 @@ export function AdminEventsPage() {
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldForm[]>([]);
 
   const openCreate = () => {
-    reset({ status: "DRAFT", password: "", raceKitDescription: "", allowMultipleRegistrations: false, allowGuestRegistration: false, requireDisclaimer: true, requireBibSpin: true, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
+    reset({ status: "DRAFT", password: "", raceKitDescription: "", allowMultipleRegistrations: false, allowGuestRegistration: false, requireDisclaimer: false, requireBibSpin: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
     setShirtSizeUrl("");
     setRaceKitUrl("");
     setCoverUrl("");
