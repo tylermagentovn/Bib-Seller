@@ -215,7 +215,7 @@ export function EventDetailPage() {
           </div>
 
           <div className="bg-white overflow-hidden rounded-3xl shadow-sm border">
-            <img src={pageImage} alt={event.name} className="w-full h-72 md:h-96 object-cover" />
+            <img src={pageImage} alt={event.name} className="w-full h-auto" />
           </div>
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border block md:hidden">
