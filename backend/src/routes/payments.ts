@@ -207,18 +207,23 @@ router.get("/webhook/payos/:adminId", (_req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-// Per-admin webhook: PayOS signs test calls with the admin's checksumKey,
-// so we look up admin by ID from the URL to use the correct credentials.
+// Per-admin webhook: PayOS signs with the admin's checksumKey → must use that admin's credentials.
 router.post("/webhook/payos/:adminId", async (req: Request, res: Response) => {
+  const adminId = String(req.params.adminId);
   try {
     const admin = await prisma.admin.findUnique({
-      where: { id: String(req.params.adminId) },
+      where: { id: adminId },
       select: { payosClientId: true, payosApiKey: true, payosChecksumKey: true },
     });
-    const payosInstance = getPayosInstance(admin);
+    if (!admin?.payosClientId || !admin?.payosApiKey || !admin?.payosChecksumKey) {
+      console.error(`PayOS webhook: admin ${adminId} not found or has no PayOS credentials`);
+      res.status(400).json({ success: false, error: "Admin PayOS credentials not configured" });
+      return;
+    }
+    const payosInstance = new PayOS({ clientId: admin.payosClientId, apiKey: admin.payosApiKey, checksumKey: admin.payosChecksumKey });
     await processPayosWebhook(payosInstance, req.body, res);
   } catch (err) {
-    console.error("PayOS webhook error:", err);
+    console.error(`PayOS webhook error (adminId=${adminId}):`, err);
     res.status(400).json({ success: false, error: "Invalid webhook data" });
   }
 });
@@ -241,7 +246,14 @@ router.post("/webhook/payos", async (req: Request, res: Response) => {
           },
         },
       });
-      payosInstance = getPayosInstance(existing?.registration?.event?.createdBy);
+      const adminCreds = existing?.registration?.event?.createdBy;
+      if (adminCreds?.payosClientId && adminCreds?.payosApiKey && adminCreds?.payosChecksumKey) {
+        payosInstance = new PayOS({ clientId: adminCreds.payosClientId, apiKey: adminCreds.payosApiKey, checksumKey: adminCreds.payosChecksumKey });
+      } else if (!rawOrderCode) {
+        console.warn("PayOS generic webhook: no orderCode in body, using global credentials");
+      } else if (!existing) {
+        console.warn(`PayOS generic webhook: no payment found for orderCode ${rawOrderCode}, using global credentials`);
+      }
     }
     await processPayosWebhook(payosInstance, req.body, res);
   } catch (err) {
