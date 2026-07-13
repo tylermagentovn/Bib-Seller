@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { api, type Event, type FieldConfig, type FieldVisibility, type CustomFieldDef, type CustomFieldType } from "@/lib/api";
@@ -273,9 +274,12 @@ export function AdminEventsPage() {
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
                   <Label>Mô tả *</Label>
-                  <textarea
-                    className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 min-h-[80px] resize-none"
-                    {...register("description")}
+                  <Controller
+                    name="description"
+                    control={control}
+                    render={({ field }) => (
+                      <RichTextEditor value={field.value ?? ""} onChange={field.onChange} />
+                    )}
                   />
                   {errors.description && <p className="text-xs text-red-500">{errors.description.message}</p>}
                 </div>

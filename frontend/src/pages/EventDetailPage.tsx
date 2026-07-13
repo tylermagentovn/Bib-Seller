@@ -134,7 +134,7 @@ export function EventDetailPage() {
   }
 
   const pageTitle = `${event.name} — Bib1s - Nền tảng đăng ký BIB giải đấu miễn phí`;
-  const pageDescription = event.description.slice(0, 160);
+  const pageDescription = event.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
   const pageImage = event.imageUrl || "https://bib1s.com/banner.jpg";
   const pageUrl = `https://bib1s.com/events/${event.slug}`;
 
@@ -276,7 +276,10 @@ export function EventDetailPage() {
 
           <div className="bg-white rounded-2xl p-6 shadow-sm border">
             <h2 className="font-semibold text-gray-900 text-lg mb-3">Giới thiệu sự kiện</h2>
-            <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{event.description}</p>
+            <div
+              className="event-description text-gray-600 leading-relaxed text-sm"
+              dangerouslySetInnerHTML={{ __html: event.description }}
+            />
           </div>
 
           {event.shirtSizeImageUrl && (
