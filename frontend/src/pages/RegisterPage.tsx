@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { api, userApi, type Event, type FieldConfig, type FieldVisibility, type CustomFieldDef } from "@/lib/api";
 import { useUser } from "@/contexts/UserContext";
-import { MEMBER_FIELD_DEFS, GENDERS, SHIRT_SIZES, BLOOD_TYPES, type MemberFieldDef } from "@/lib/memberFields";
+import { MEMBER_FIELD_DEFS, GENDERS, SHIRT_SIZES, BLOOD_TYPES, COUNTRIES, type MemberFieldDef } from "@/lib/memberFields";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,8 @@ const DEFAULT_FIELD_CONFIG: Required<FieldConfig> = {
   medicalConditions: "hidden",
   emergencyName: "required",
   emergencyPhone: "required",
+  address: "hidden",
+  nationality: "hidden",
 };
 
 function vis(cfg: FieldConfig, key: keyof FieldConfig): FieldVisibility {
@@ -45,6 +47,8 @@ type MemberFormData = {
   medicalConditions?: string;
   emergencyName?: string;
   emergencyPhone?: string;
+  address?: string;
+  nationality?: string;
 };
 
 type FormData = {
@@ -61,6 +65,8 @@ type FormData = {
   medicalConditions?: string;
   emergencyName?: string;
   emergencyPhone?: string;
+  address?: string;
+  nationality?: string;
   teamMembers?: MemberFormData[];
 };
 
@@ -140,6 +146,12 @@ function buildSchema(cfg: FieldConfig, isRelay: boolean, memberCfg: FieldConfig)
       : z.string().optional(),
     emergencyPhone: show("emergencyPhone")
       ? req("emergencyPhone") ? str("Vui lòng nhập số điện thoại liên hệ khẩn cấp").min(9, "Số điện thoại không hợp lệ") : z.string().optional()
+      : z.string().optional(),
+    address: show("address")
+      ? req("address") ? str("Vui lòng nhập địa chỉ").min(1, "Vui lòng nhập địa chỉ") : z.string().optional()
+      : z.string().optional(),
+    nationality: show("nationality")
+      ? req("nationality") ? str("Vui lòng chọn quốc tịch").min(1, "Vui lòng chọn quốc tịch") : z.string().optional()
       : z.string().optional(),
   };
 
@@ -528,6 +540,27 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
                   {...register("medicalConditions")}
                 />
                 {errors.medicalConditions && <p className="text-xs text-red-500">{errors.medicalConditions.message}</p>}
+              </div>
+            )}
+            {show("address") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("address", "Địa chỉ")}</Label>
+                <Input placeholder="Số nhà, đường, quận/huyện, tỉnh/thành phố" {...register("address")} />
+                {errors.address && <p className="text-xs text-red-500">{errors.address.message}</p>}
+              </div>
+            )}
+            {show("nationality") && (
+              <div className="space-y-1.5">
+                <Label>{fieldLabel("nationality", "Quốc tịch")}</Label>
+                <Select value={watch("nationality") ?? ""} onValueChange={(v) => setValue("nationality", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn quốc tịch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {errors.nationality && <p className="text-xs text-red-500">{errors.nationality.message}</p>}
               </div>
             )}
             {(show("emergencyName") || show("emergencyPhone")) && (

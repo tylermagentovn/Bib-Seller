@@ -40,6 +40,8 @@ model Event {
   fieldConfig                 Json?
   allowMultipleRegistrations  Boolean   @default(false)
   allowGuestRegistration      Boolean   @default(false)
+  requireDisclaimer           Boolean   @default(true)
+  requireBibSpin              Boolean   @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   createdById String?
@@ -106,6 +108,8 @@ model Registration {
   medicalConditions String?
   emergencyName  String?
   emergencyPhone String?
+  address        String?
+  nationality    String?
   bibNumber           Int?
   disclaimerSignature String?
   disclaimerSignedAt  DateTime?
@@ -141,6 +145,8 @@ model TeamMember {
   medicalConditions String?
   emergencyName     String?
   emergencyPhone    String?
+  address           String?
+  nationality       String?
   createdAt         DateTime  @default(now())
 
   registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)

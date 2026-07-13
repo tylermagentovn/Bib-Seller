@@ -95,6 +95,8 @@ export interface FieldConfig {
   medicalConditions?: FieldVisibility;
   emergencyName?: FieldVisibility;
   emergencyPhone?: FieldVisibility;
+  address?: FieldVisibility;
+  nationality?: FieldVisibility;
 }
 
 export interface TeamMember {
@@ -112,6 +114,8 @@ export interface TeamMember {
   medicalConditions: string | null;
   emergencyName: string | null;
   emergencyPhone: string | null;
+  address: string | null;
+  nationality: string | null;
   createdAt: string;
 }
 
@@ -147,6 +151,8 @@ export interface Event {
   fieldConfig: FieldConfig | null;
   allowMultipleRegistrations: boolean;
   allowGuestRegistration: boolean;
+  requireDisclaimer: boolean;
+  requireBibSpin: boolean;
   distances: Distance[];
   customFieldDefs?: CustomFieldDef[];
   createdAt: string;
@@ -167,6 +173,8 @@ export interface Registration {
   shirtSize: string | null;
   bloodType: string | null;
   medicalConditions: string | null;
+  address: string | null;
+  nationality: string | null;
   bibNumber: number | null;
   disclaimerSignature: string | null;
   disclaimerSignedAt: string | null;

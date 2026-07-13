@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Calendar, BadgeCheck, Shirt, Droplets, HeartPulse, Shield, CircleUser } from "lucide-react";
+import { Calendar, BadgeCheck, Shirt, Droplets, HeartPulse, Shield, CircleUser, MapPin, Globe } from "lucide-react";
 import type { FieldConfig } from "@/lib/api";
 
 export const GENDERS = ["Nam", "Nữ", "Khác"] as const;
@@ -10,6 +10,34 @@ export const SHIRT_SIZES = [
   "Kids - 4", "Kids - 5", "Kids - 6", "Kids - 7", "Kids - 8", "Kids - 9", "Kids - 10", "Kids - 11", "Kids - 12", "Kids - 13"
 ];
 export const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Không biết"];
+export const COUNTRIES = [
+  "Việt Nam", "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda",
+  "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh",
+  "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina",
+  "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia",
+  "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros",
+  "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic", "Denmark", "Djibouti",
+  "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea",
+  "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia",
+  "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti",
+  "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel",
+  "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan",
+  "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania",
+  "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands",
+  "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro",
+  "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand",
+  "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan",
+  "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland",
+  "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia",
+  "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia",
+  "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia",
+  "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka",
+  "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania",
+  "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey",
+  "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom",
+  "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Yemen",
+  "Zambia", "Zimbabwe",
+] as const;
 
 export type MemberFieldType = "text" | "tel" | "date" | "select" | "textarea";
 
@@ -86,6 +114,26 @@ export const MEMBER_FIELD_DEFS: MemberFieldDef[] = [
     placeholder: "Bệnh lý hoặc tình trạng sức khỏe cần lưu ý (nếu có)",
     errorMessage: "Vui lòng nhập thông tin bệnh lý",
     displayIcon: HeartPulse,
+  },
+  {
+    key: "address",
+    label: "Địa chỉ",
+    type: "text",
+    defaultValue: "",
+    configKey: "address",
+    placeholder: "Số nhà, đường, quận/huyện, tỉnh/thành phố",
+    errorMessage: "Vui lòng nhập địa chỉ",
+    displayIcon: MapPin,
+  },
+  {
+    key: "nationality",
+    label: "Quốc tịch",
+    type: "select",
+    defaultValue: "_none_",
+    configKey: "nationality",
+    options: COUNTRIES,
+    errorMessage: "Vui lòng chọn quốc tịch",
+    displayIcon: Globe,
   },
   {
     key: "emergencyName",

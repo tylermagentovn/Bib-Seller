@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Registration, type TeamMember, type CustomFieldDef } from "@/lib/api";
-import { MEMBER_FIELD_DEFS, GENDERS, SHIRT_SIZES, BLOOD_TYPES, initFieldValue, normalizeFieldValue } from "@/lib/memberFields";
+import { MEMBER_FIELD_DEFS, GENDERS, SHIRT_SIZES, BLOOD_TYPES, COUNTRIES, initFieldValue, normalizeFieldValue } from "@/lib/memberFields";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import {
   Loader2, Pencil, ChevronLeft, ChevronRight, Search,
   X, User, Phone, Mail, Calendar, Shield, CreditCard, CircleUser,
   PenLine, Users, CheckCircle, Clock, Download, Trash2, RefreshCw,
-  BadgeCheck, Shirt, Droplets, HeartPulse,
+  BadgeCheck, Shirt, Droplets, HeartPulse, MapPin, Globe,
 } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -126,6 +126,8 @@ function EditInfoModal({ reg, onClose }: {
   const [medicalConditions, setMedicalConditions] = useState(reg.medicalConditions ?? "");
   const [emergencyName, setEmergencyName] = useState(reg.emergencyName ?? "");
   const [emergencyPhone, setEmergencyPhone] = useState(reg.emergencyPhone ?? "");
+  const [address, setAddress] = useState(reg.address ?? "");
+  const [nationality, setNationality] = useState(reg.nationality ?? "_none_");
   const isRelay = reg.distance.type === "RELAY";
   const fieldConfig = reg.event.fieldConfig;
   const memberFieldConfig = reg.distance.memberFieldConfig;
@@ -183,6 +185,8 @@ function EditInfoModal({ reg, onClose }: {
       medicalConditions: medicalConditions || null,
       emergencyName: emergencyName || null,
       emergencyPhone: emergencyPhone || null,
+      address: address || null,
+      nationality: nationality === "_none_" ? null : nationality || null,
     };
     if (teamMembers.length > 0) {
       payload.teamMembers = teamMembers.map((m) => ({
@@ -254,7 +258,7 @@ function EditInfoModal({ reg, onClose }: {
             )}
           </div>
 
-          {(fv("gender") || fv("idNumber") || fv("shirtSize") || fv("bloodType") || fv("medicalConditions")) && (
+          {(fv("gender") || fv("idNumber") || fv("shirtSize") || fv("bloodType") || fv("medicalConditions") || fv("address") || fv("nationality")) && (
             <div className="border-t pt-4">
               <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Thông tin bổ sung</h4>
               <div className="grid grid-cols-2 gap-3">
@@ -309,6 +313,24 @@ function EditInfoModal({ reg, onClose }: {
                       onChange={(e) => setMedicalConditions(e.target.value)}
                       placeholder="Ghi chú bệnh lý..."
                     />
+                  </div>
+                )}
+                {fv("address") && (
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Địa chỉ</label>
+                    <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Số nhà, đường, quận/huyện, tỉnh/thành phố" />
+                  </div>
+                )}
+                {fv("nationality") && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Quốc tịch</label>
+                    <Select value={nationality} onValueChange={setNationality}>
+                      <SelectTrigger><SelectValue placeholder="Chọn quốc tịch" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none_">—</SelectItem>
+                        {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               </div>
@@ -610,6 +632,24 @@ function DetailModal({ reg, onClose, onEditBib, onEditStatus, onEditInfo }: {
                   <div className="flex flex-col w-full gap-1">
                     <span className="text-gray-500">Bệnh lý</span>
                     <span className="font-medium text-gray-700 bg-white border rounded-lg p-2 text-xs whitespace-pre-wrap">{reg.medicalConditions}</span>
+                  </div>
+                </div>
+              )}
+              {reg.address != null && (
+                <div className="flex items-center gap-2.5">
+                  <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex justify-between w-full">
+                    <span className="text-gray-500">Địa chỉ</span>
+                    <span className="font-medium text-right max-w-[60%]">{reg.address}</span>
+                  </div>
+                </div>
+              )}
+              {reg.nationality != null && (
+                <div className="flex items-center gap-2.5">
+                  <Globe className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex justify-between w-full">
+                    <span className="text-gray-500">Quốc tịch</span>
+                    <span className="font-medium">{reg.nationality}</span>
                   </div>
                 </div>
               )}

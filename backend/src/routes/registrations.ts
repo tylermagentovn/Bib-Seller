@@ -26,6 +26,8 @@ const teamMemberSchema = z.object({
   medicalConditions: z.string().nullable().optional(),
   emergencyName: z.string().nullable().optional(),
   emergencyPhone: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  nationality: z.string().nullable().optional(),
 });
 
 const registrationSchema = z.object({
@@ -42,6 +44,8 @@ const registrationSchema = z.object({
   medicalConditions: z.string().optional(),
   emergencyName: z.string().optional(),
   emergencyPhone: z.string().optional(),
+  address: z.string().optional(),
+  nationality: z.string().optional(),
   teamMembers: z.array(teamMemberSchema).optional(),
   customFieldValues: z.array(z.object({
     fieldDefId: z.string(),
@@ -135,6 +139,8 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
       medicalConditions: registrationData.medicalConditions ?? null,
       emergencyName: registrationData.emergencyName ?? null,
       emergencyPhone: registrationData.emergencyPhone ?? null,
+      address: registrationData.address ?? null,
+      nationality: registrationData.nationality ?? null,
       userId: req.userId ?? null,
       status: isFree ? "PAID" : "PENDING",
       payment: isFree ? undefined : {
@@ -159,6 +165,8 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
                 medicalConditions: m.medicalConditions ?? null,
                 emergencyName: m.emergencyName ?? null,
                 emergencyPhone: m.emergencyPhone ?? null,
+                address: m.address ?? null,
+                nationality: m.nationality ?? null,
               })),
             },
           }
@@ -188,7 +196,10 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
   // Send success email for free registrations (fire-and-forget)
   if (isFree && registration.email) {
     const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
-    const continueUrl = `${frontend.replace(/\/$/, "")}/payment/${registration.id}/success?step=waiver`;
+    const needsContinue = (registration.event as any).requireDisclaimer || (registration.event as any).requireBibSpin;
+    const continueUrl = needsContinue
+      ? `${frontend.replace(/\/$/, "")}/payment/${registration.id}/success?step=waiver`
+      : undefined;
     // Use customFieldValues from request body (DB record created after this point)
     const emailCustomFields = (registration.event as any).customFieldDefs
       ?.filter((d: any) => d.includeInEmail)
@@ -309,6 +320,7 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
   const headers = [
     "ID", "Ho ten", "Gioi tinh", "Ngay sinh", "Dien thoai", "Email",
     "So CCCD", "Size ao", "Nhom mau", "Benh ly",
+    "Dia chi", "Quoc tich",
     "Lien he khan cap", "SDT khan cap",
     "Su kien", "Cu ly", "Loai", "BIB",
     "Trang thai", "So tien (VND)", "Thoi gian thanh toan", "Ma tham chieu",
@@ -328,6 +340,8 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
           m.idNumber ?? "",
           m.shirtSize ?? "",
           m.bloodType ?? "",
+          m.address ?? "",
+          m.nationality ?? "",
           m.emergencyName ? `KC:${m.emergencyName}(${m.emergencyPhone ?? ""})` : "",
         ].filter(Boolean);
         return parts.join("|");
@@ -352,6 +366,8 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
       r.shirtSize ?? "",
       r.bloodType ?? "",
       r.medicalConditions ?? "",
+      r.address ?? "",
+      r.nationality ?? "",
       r.emergencyName ?? "",
       r.emergencyPhone ?? "",
       r.event.name,
@@ -466,6 +482,8 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     medicalConditions: z.string().nullable().optional(),
     emergencyName: z.string().optional(),
     emergencyPhone: z.string().optional(),
+    address: z.string().nullable().optional(),
+    nationality: z.string().nullable().optional(),
     teamMembers: z.array(teamMemberSchema).optional(),
     customFieldValues: z.array(z.object({
       fieldDefId: z.string(),
@@ -520,6 +538,8 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
           medicalConditions: m.medicalConditions ?? null,
           emergencyName: m.emergencyName ?? null,
           emergencyPhone: m.emergencyPhone ?? null,
+          address: m.address ?? null,
+          nationality: m.nationality ?? null,
         })),
       });
     }

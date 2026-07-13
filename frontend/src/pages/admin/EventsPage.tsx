@@ -28,6 +28,8 @@ const FIELD_CONFIG_ITEMS: { key: keyof FieldConfig; label: string }[] = [
   { key: "medicalConditions", label: "Bệnh lý" },
   { key: "emergencyName", label: "Tên liên hệ khẩn cấp" },
   { key: "emergencyPhone", label: "SDT liên hệ khẩn cấp" },
+  { key: "address", label: "Địa chỉ" },
+  { key: "nationality", label: "Quốc tịch" },
 ];
 
 const DEFAULT_FIELD_CONFIG: FieldConfig = {
@@ -42,6 +44,8 @@ const DEFAULT_FIELD_CONFIG: FieldConfig = {
   medicalConditions: "hidden",
   emergencyName: "required",
   emergencyPhone: "required",
+  address: "hidden",
+  nationality: "hidden",
 };
 
 const MEMBER_FIELD_CONFIG_ITEMS: { key: keyof FieldConfig; label: string }[] = [
@@ -55,6 +59,8 @@ const MEMBER_FIELD_CONFIG_ITEMS: { key: keyof FieldConfig; label: string }[] = [
   { key: "medicalConditions", label: "Bệnh lý" },
   { key: "emergencyName", label: "Tên liên hệ khẩn cấp" },
   { key: "emergencyPhone", label: "SDT liên hệ khẩn cấp" },
+  { key: "address", label: "Địa chỉ" },
+  { key: "nationality", label: "Quốc tịch" },
 ];
 
 const DEFAULT_MEMBER_FIELD_CONFIG: FieldConfig = {
@@ -68,6 +74,8 @@ const DEFAULT_MEMBER_FIELD_CONFIG: FieldConfig = {
   medicalConditions: "hidden",
   emergencyName: "optional",
   emergencyPhone: "optional",
+  address: "hidden",
+  nationality: "hidden",
 };
 
 const distanceSchema = z.object({
@@ -97,6 +105,8 @@ const eventSchema = z.object({
   password: z.string().optional(),
   allowMultipleRegistrations: z.boolean(),
   allowGuestRegistration: z.boolean(),
+  requireDisclaimer: z.boolean(),
+  requireBibSpin: z.boolean(),
   distances: z.array(distanceSchema).min(1, "Cần ít nhất 1 cự ly"),
 });
 
@@ -115,7 +125,7 @@ export function AdminEventsPage() {
 
   const { register, handleSubmit, control, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(eventSchema),
-    defaultValues: { status: "DRAFT", password: "", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", allowMultipleRegistrations: false, allowGuestRegistration: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
+    defaultValues: { status: "DRAFT", password: "", shirtSizeImageUrl: "", raceKitImageUrl: "", raceKitDescription: "", allowMultipleRegistrations: false, allowGuestRegistration: false, requireDisclaimer: true, requireBibSpin: true, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100 }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "distances" });
@@ -137,7 +147,7 @@ export function AdminEventsPage() {
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldForm[]>([]);
 
   const openCreate = () => {
-    reset({ status: "DRAFT", password: "", raceKitDescription: "", allowMultipleRegistrations: false, allowGuestRegistration: false, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
+    reset({ status: "DRAFT", password: "", raceKitDescription: "", allowMultipleRegistrations: false, allowGuestRegistration: false, requireDisclaimer: true, requireBibSpin: true, distances: [{ name: "", price: 0, maxSlots: 100, bibStart: 1, bibEnd: 100, type: "SOLO", teamSize: null }] });
     setShirtSizeUrl("");
     setRaceKitUrl("");
     setCoverUrl("");
@@ -168,6 +178,8 @@ export function AdminEventsPage() {
       password: event.password ?? "",
       allowMultipleRegistrations: (event as any).allowMultipleRegistrations ?? false,
       allowGuestRegistration: (event as any).allowGuestRegistration ?? false,
+      requireDisclaimer: (event as any).requireDisclaimer ?? true,
+      requireBibSpin: (event as any).requireBibSpin ?? true,
       distances: event.distances.map((d) => ({
         id: d.id,
         name: d.name,
@@ -549,6 +561,32 @@ export function AdminEventsPage() {
                     </Select>
                   </div>
                 )}
+                <div className="space-y-1.5">
+                  <Label>Yêu cầu ký miễn trừ trách nhiệm</Label>
+                  <Select
+                    value={watch("requireDisclaimer") ? "yes" : "no"}
+                    onValueChange={(v) => setValue("requireDisclaimer", v === "yes")}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Có — người dùng phải ký</SelectItem>
+                      <SelectItem value="no">Không — bỏ qua bước ký</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Yêu cầu quay số BIB</Label>
+                  <Select
+                    value={watch("requireBibSpin") ? "yes" : "no"}
+                    onValueChange={(v) => setValue("requireBibSpin", v === "yes")}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Có — người dùng tự quay BIB</SelectItem>
+                      <SelectItem value="no">Không — bỏ qua bước quay BIB</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Field config */}
