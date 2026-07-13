@@ -854,10 +854,16 @@ export function AdminRegistrationsPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [eventFilter, setEventFilter] = useState("ALL");
   const [editingReg, setEditingReg] = useState<Registration | null>(null);
   const [newBib, setNewBib] = useState("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  const { data: eventsData } = useQuery({
+    queryKey: ["admin-events-list"],
+    queryFn: () => api.get("/events").then((r) => r.data),
+  });
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -876,6 +882,7 @@ export function AdminRegistrationsPage() {
     try {
       const params = new URLSearchParams();
       if (statusFilter !== "ALL") params.set("status", statusFilter);
+      if (eventFilter !== "ALL") params.set("eventId", eventFilter);
       const token = localStorage.getItem("admin_token");
       const res = await fetch(`/api/registrations/admin/export?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -893,10 +900,11 @@ export function AdminRegistrationsPage() {
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-registrations", { page, status: statusFilter, search: debouncedSearch }],
+    queryKey: ["admin-registrations", { page, status: statusFilter, event: eventFilter, search: debouncedSearch }],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
       if (statusFilter !== "ALL") params.set("status", statusFilter);
+      if (eventFilter !== "ALL") params.set("eventId", eventFilter);
       if (debouncedSearch) params.set("search", debouncedSearch);
       return api.get(`/registrations/admin/all?${params}`).then((r) => r.data);
     },
@@ -967,6 +975,17 @@ export function AdminRegistrationsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Select value={eventFilter} onValueChange={(v) => { setEventFilter(v); setPage(1); }}>
+          <SelectTrigger className="w-56">
+            <SelectValue placeholder="Tất cả sự kiện" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Tất cả sự kiện</SelectItem>
+            {(eventsData ?? []).map((ev: { id: string; name: string }) => (
+              <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
           <SelectTrigger className="w-40">
             <SelectValue />
