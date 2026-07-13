@@ -9,6 +9,7 @@ import { requireAuth, AuthRequest } from "../middleware/auth";
 const router = Router();
 
 const distanceWithCount = {
+  orderBy: { price: "asc" as const },
   include: { _count: { select: { registrations: { where: { status: "PAID" as const } } } } },
 };
 
