@@ -185,7 +185,7 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
         </div>
         <div class="body">
           <p>Xin chào <strong>${data.fullName ?? "Bạn"}</strong>,</p>
-          <p>Đăng ký của bạn đã được xác nhận${data.continueUrl ? ". Tiếp theo, vui lòng nhấn nút bên dưới để hoàn tất các bước còn lại." : "."}</p>
+          <p>Đăng ký của bạn đã được xác nhận.</p>
           <table class="info-table">
             <tr><td>Sự kiện</td><td>${data.eventName}</td></tr>
             <tr><td>Cự ly</td><td>${data.distanceName}</td></tr>
@@ -226,12 +226,6 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
               <td style="padding: 8px 10px; font-weight: 500;">${f.value || "—"}</td>
             </tr>`).join("")}
           </table>
-          ` : ""}
-          ${data.continueUrl ? `
-          <p style="text-align: center; margin: 28px 0;">
-            <a class="btn" href="${data.continueUrl}">Tiếp tục hoàn tất đăng ký →</a>
-          </p>
-          <p style="color: #888; font-size: 13px;">Nếu nút không hoạt động, sao chép đường dẫn sau vào trình duyệt:<br/><a href="${data.continueUrl}">${data.continueUrl}</a></p>
           ` : ""}
         </div>
         <div class="footer">
