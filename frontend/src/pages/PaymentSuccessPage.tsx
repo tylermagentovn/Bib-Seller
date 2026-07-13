@@ -37,11 +37,13 @@ export function PaymentSuccessPage() {
   // Determine flow step when registration becomes PAID
   useEffect(() => {
     if (registration?.status === "PAID" && step === null) {
-      const hasDisclaimer = !!registration.event.disclaimer;
-      const alreadySigned = !!registration.disclaimerSignedAt;
+      const needsDisclaimer = registration.event.requireDisclaimer && !!registration.event.disclaimer && !registration.disclaimerSignedAt;
+      const needsBib = registration.event.requireBibSpin;
       const skipLanding = searchParams.get("step") === "waiver";
       if (skipLanding) {
-        setStep(hasDisclaimer && !alreadySigned ? "disclaimer" : "bib");
+        if (needsDisclaimer) setStep("disclaimer");
+        else if (needsBib) setStep("bib");
+        else setStep("landing");
       } else {
         setStep("landing");
       }
@@ -58,7 +60,13 @@ export function PaymentSuccessPage() {
   const signMutation = useMutation({
     mutationFn: () =>
       api.post(`/registrations/${id}/sign-disclaimer`, { signature }).then((r) => r.data),
-    onSuccess: () => setStep("bib"),
+    onSuccess: () => {
+      if (registration?.event.requireBibSpin) {
+        setStep("bib");
+      } else {
+        setStep("landing");
+      }
+    },
   });
 
   const spinMutation = useMutation({
@@ -150,9 +158,10 @@ export function PaymentSuccessPage() {
   // Step 0: Landing — payment/registration confirmed
   if (step === "landing") {
     const isFreeEvent = !registration.payment || registration.payment.amount === 0;
-    const hasDisclaimer = !!registration.event.disclaimer;
-    const alreadySigned = !!registration.disclaimerSignedAt;
-    const nextStep: Step = hasDisclaimer && !alreadySigned ? "disclaimer" : "bib";
+    const needsDisclaimer = registration.event.requireDisclaimer && !!registration.event.disclaimer && !registration.disclaimerSignedAt;
+    const needsBib = registration.event.requireBibSpin;
+    const hasNextStep = needsDisclaimer || needsBib;
+    const nextStep: Step = needsDisclaimer ? "disclaimer" : "bib";
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-violet-50 py-10 px-4">
@@ -175,9 +184,15 @@ export function PaymentSuccessPage() {
             </div>
           )}
 
-          <Button size="lg" className="w-full" onClick={() => setStep(nextStep)}>
-            Ký miễn trừ &amp; Quay số BIB →
-          </Button>
+          {hasNextStep ? (
+            <Button size="lg" className="w-full" onClick={() => setStep(nextStep)}>
+              {needsDisclaimer && needsBib ? "Ký miễn trừ & Quay số BIB →" : needsDisclaimer ? "Ký miễn trừ trách nhiệm →" : "Quay số BIB →"}
+            </Button>
+          ) : (
+            <Button size="lg" variant="outline" className="w-full" asChild>
+              <a href="/">Về trang chủ</a>
+            </Button>
+          )}
         </div>
       </div>
     );

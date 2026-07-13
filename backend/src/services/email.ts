@@ -147,7 +147,7 @@ interface RegistrationSuccessEmailData {
   medicalConditions?: string | null;
   emergencyName?: string | null;
   emergencyPhone?: string | null;
-  continueUrl: string;
+  continueUrl?: string;
   teamMembers?: TeamMemberEmailInfo[];
   customFields?: { label: string; value: string }[];
 }
@@ -185,7 +185,7 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
         </div>
         <div class="body">
           <p>Xin chào <strong>${data.fullName ?? "Bạn"}</strong>,</p>
-          <p>Đăng ký của bạn đã được xác nhận. Tiếp theo, bạn cần <strong>ký bản miễn trừ trách nhiệm</strong> và <strong>quay số BIB</strong> để hoàn tất.</p>
+          <p>Đăng ký của bạn đã được xác nhận${data.continueUrl ? ". Tiếp theo, vui lòng nhấn nút bên dưới để hoàn tất các bước còn lại." : "."}</p>
           <table class="info-table">
             <tr><td>Sự kiện</td><td>${data.eventName}</td></tr>
             <tr><td>Cự ly</td><td>${data.distanceName}</td></tr>
@@ -227,10 +227,12 @@ export async function sendRegistrationSuccessEmail(data: RegistrationSuccessEmai
             </tr>`).join("")}
           </table>
           ` : ""}
+          ${data.continueUrl ? `
           <p style="text-align: center; margin: 28px 0;">
-            <a class="btn" href="${data.continueUrl}">Ký miễn trừ &amp; Quay số BIB →</a>
+            <a class="btn" href="${data.continueUrl}">Tiếp tục hoàn tất đăng ký →</a>
           </p>
           <p style="color: #888; font-size: 13px;">Nếu nút không hoạt động, sao chép đường dẫn sau vào trình duyệt:<br/><a href="${data.continueUrl}">${data.continueUrl}</a></p>
+          ` : ""}
         </div>
         <div class="footer">
           <div class="brand">Bib1s - Giải pháp quản lý giải đấu thể thao chuyên nghiệp</div>

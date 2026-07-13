@@ -174,7 +174,10 @@ async function processPayosWebhook(payosInstance: PayOS, body: any, res: Respons
   const reg = payment.registration;
   if (reg.email) {
     const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
-    const continueUrl = `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`;
+    const needsContinue = (reg.event as any).requireDisclaimer || (reg.event as any).requireBibSpin;
+    const continueUrl = needsContinue
+      ? `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`
+      : undefined;
     sendRegistrationSuccessEmail({
       to: reg.email,
       fullName: reg.fullName ?? null,
@@ -299,7 +302,10 @@ router.post("/dev-confirm/:registrationId", async (req: Request, res: Response) 
   const reg = payment.registration;
   if (reg.email) {
     const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
-    const continueUrl = `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`;
+    const needsContinue = (reg.event as any).requireDisclaimer || (reg.event as any).requireBibSpin;
+    const continueUrl = needsContinue
+      ? `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`
+      : undefined;
     sendRegistrationSuccessEmail({
       to: reg.email,
       fullName: reg.fullName ?? null,
