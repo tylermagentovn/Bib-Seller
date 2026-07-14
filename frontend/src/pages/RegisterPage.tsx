@@ -774,7 +774,7 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
                 ) : selectedDistance?.price === 0 ? (
                   "Đăng ký miễn phí"
                 ) : (
-                  "Đăng ký & Thanh toán"
+                  "Tiếp tục để thanh toán"
                 )}
               </Button>
               {mutation.isError && (
