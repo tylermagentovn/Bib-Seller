@@ -862,7 +862,7 @@ export function AdminRegistrationsPage() {
 
   const { data: eventsData } = useQuery({
     queryKey: ["admin-events-list"],
-    queryFn: () => api.get("/events").then((r) => r.data),
+    queryFn: () => api.get("/events/admin/all").then((r) => r.data),
   });
 
   useEffect(() => {
