@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import ExcelJS from "exceljs";
 import { prisma } from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/auth";
 import { optionalUserAuth, UserRequest } from "../middleware/userAuth";
@@ -273,7 +274,7 @@ router.get("/:id", async (req: Request, res: Response) => {
   res.json(registration);
 });
 
-// Admin: export registrations as CSV
+// Admin: export registrations as Excel
 router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response) => {
   const { eventId, status } = req.query;
   const where: Record<string, unknown> = {};
@@ -297,14 +298,6 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
     orderBy: { createdAt: "desc" },
   });
 
-  const escape = (val: string | number | null | undefined) => {
-    if (val == null) return "";
-    const s = String(val);
-    return s.includes(",") || s.includes('"') || s.includes("\n")
-      ? `"${s.replace(/"/g, '""')}"`
-      : s;
-  };
-
   // Collect custom field defs across all events in this export (preserving order)
   const seenDefIds = new Set<string>();
   const exportDefs: { id: string; label: string }[] = [];
@@ -317,21 +310,33 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
     }
   }
 
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Đăng ký");
+
   const headers = [
-    "ID", "Ho ten", "Gioi tinh", "Ngay sinh", "Dien thoai", "Email",
-    "So CCCD", "Size ao", "Nhom mau", "Benh ly",
-    "Dia chi", "Quoc tich",
-    "Lien he khan cap", "SDT khan cap",
-    "Su kien", "Cu ly", "Loai", "BIB",
-    "Trang thai", "So tien (VND)", "Thoi gian thanh toan", "Ma tham chieu",
-    "Da ky mien tru", "Thanh vien nhom",
-    "Ngay dang ky",
+    "ID", "Họ tên", "Giới tính", "Ngày sinh", "Điện thoại", "Email",
+    "Số CCCD", "Size áo", "Nhóm máu", "Bệnh lý",
+    "Địa chỉ", "Quốc tịch",
+    "Liên hệ khẩn cấp", "SĐT khẩn cấp",
+    "Sự kiện", "Cự ly", "Loại", "BIB",
+    "Trạng thái", "Số tiền (VND)", "Thời gian thanh toán", "Mã tham chiếu",
+    "Đã ký miễn trừ", "Thành viên nhóm",
+    "Ngày đăng ký",
     ...exportDefs.map((d) => d.label),
   ];
 
-  const rows = registrations.map((r) => {
+  sheet.columns = headers.map((h) => ({ header: h, key: h, width: 20 }));
+
+  // Style header row
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
+  headerRow.alignment = { vertical: "middle", horizontal: "center" };
+  headerRow.height = 22;
+
+  for (const r of registrations) {
     const members = r.teamMembers
-      .map((m) => {
+      .map((m: any) => {
         const parts = [
           `${m.memberIndex}.${m.fullName}`,
           m.phone,
@@ -349,13 +354,13 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
       .join("; ");
 
     const customCols = exportDefs.map((def) => {
-      const cv = (r.customFieldValues as any[]).find((v) => v.fieldDefId === def.id);
+      const cv = (r.customFieldValues as any[]).find((v: any) => v.fieldDefId === def.id);
       const raw = cv?.value ?? "";
       try { const arr = JSON.parse(raw); if (Array.isArray(arr)) return arr.join(", "); } catch {}
       return raw;
     });
 
-    return [
+    sheet.addRow([
       r.id,
       r.fullName ?? "",
       r.gender ?? "",
@@ -372,25 +377,34 @@ router.get("/admin/export", requireAuth, async (req: AuthRequest, res: Response)
       r.emergencyPhone ?? "",
       r.event.name,
       r.distance.name,
-      r.distance.type === "RELAY" ? "Tiep suc" : "Ca nhan",
+      r.distance.type === "RELAY" ? "Tiếp sức" : "Cá nhân",
       r.bibNumber ?? "",
-      r.status === "PAID" ? "Da thanh toan" : r.status === "CANCELLED" ? "Da huy" : "Cho thanh toan",
+      r.status === "PAID" ? "Đã thanh toán" : r.status === "CANCELLED" ? "Đã hủy" : "Chờ thanh toán",
       r.payment?.amount ?? "",
       r.payment?.paidAt ? r.payment.paidAt.toISOString().replace("T", " ").slice(0, 19) : "",
       r.payment?.payosRef ?? "",
-      r.disclaimerSignedAt ? "Co" : "Khong",
+      r.disclaimerSignedAt ? "Có" : "Không",
       members,
       r.createdAt.toISOString().replace("T", " ").slice(0, 19),
       ...customCols,
-    ].map(escape).join(",");
+    ]);
+  }
+
+  // Auto-fit column widths (cap at 50)
+  sheet.columns.forEach((col) => {
+    let max = col.header ? String(col.header).length : 10;
+    col.eachCell?.({ includeEmpty: false }, (cell) => {
+      const len = cell.value ? String(cell.value).length : 0;
+      if (len > max) max = len;
+    });
+    col.width = Math.min(max + 2, 50);
   });
 
-  const csv = "﻿" + [headers.join(","), ...rows].join("\r\n");
-  const filename = `dang-ky-${new Date().toISOString().slice(0, 10)}.csv`;
-
-  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  const filename = `dang-ky-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.send(csv);
+  await workbook.xlsx.write(res);
+  res.end();
 });
 
 // Admin: list all registrations
