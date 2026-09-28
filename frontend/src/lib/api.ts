@@ -153,6 +153,7 @@ export interface Event {
   allowGuestRegistration: boolean;
   requireDisclaimer: boolean;
   requireBibSpin: boolean;
+  hiddenShirtSizes?: string[];
   distances: Distance[];
   customFieldDefs?: CustomFieldDef[];
   createdAt: string;

@@ -27,7 +27,11 @@ router.get("/", async (_req: Request, res: Response) => {
 router.get("/:slug", async (req: Request, res: Response) => {
   const event = await prisma.event.findUnique({
     where: { slug: req.params.slug as string },
-    include: { distances: distanceWithCount, customFieldDefs: { orderBy: { order: "asc" } } },
+    include: {
+      distances: distanceWithCount,
+      customFieldDefs: { orderBy: { order: "asc" } },
+      createdBy: { select: { hiddenShirtSizes: true } },
+    },
   });
   if (!event) {
     res.status(404).json({ error: "Event not found" });
@@ -46,8 +50,8 @@ router.get("/:slug", async (req: Request, res: Response) => {
     }
   }
 
-  const { password: _pw, ...safeEvent } = event;
-  res.json(safeEvent);
+  const { password: _pw, createdBy, ...safeEvent } = event;
+  res.json({ ...safeEvent, hiddenShirtSizes: createdBy?.hiddenShirtSizes ?? [] });
 });
 
 // Admin: list events (SUPER_ADMIN sees all, EVENT_MANAGER sees only their own)

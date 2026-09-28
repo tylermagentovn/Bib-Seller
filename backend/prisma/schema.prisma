@@ -19,6 +19,8 @@ model Admin {
   payosApiKey      String?
   payosChecksumKey String?
 
+  hiddenShirtSizes String[] @default([])
+
   events Event[]
 }
 

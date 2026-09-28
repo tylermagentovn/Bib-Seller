@@ -76,10 +76,24 @@ router.post("/", optionalUserAuth, async (req: UserRequest, res: Response) => {
   // Validate event + distance exist
   const distance = await prisma.distance.findFirst({
     where: { id: data.distanceId, eventId: data.eventId },
-    include: { event: { select: { allowMultipleRegistrations: true } } },
+    include: {
+      event: {
+        select: {
+          allowMultipleRegistrations: true,
+          createdBy: { select: { hiddenShirtSizes: true } },
+        },
+      },
+    },
   });
   if (!distance) {
     res.status(404).json({ error: "Event or distance not found" });
+    return;
+  }
+
+  const hiddenSizes = distance.event.createdBy?.hiddenShirtSizes ?? [];
+  const submittedSizes = [data.shirtSize, ...(data.teamMembers ?? []).map((m) => m.shirtSize)];
+  if (submittedSizes.some((s) => s && hiddenSizes.includes(s))) {
+    res.status(400).json({ error: "Size áo đã chọn không còn khả dụng cho sự kiện này" });
     return;
   }
 

@@ -123,6 +123,30 @@ router.patch("/admins/:id/role", requireSuperAdmin, async (req: AuthRequest, res
   res.json(admin);
 });
 
+// Any admin can read/update which shirt sizes are hidden on their own events
+router.get("/me/options", requireAuth, async (req: AuthRequest, res: Response) => {
+  const admin = await prisma.admin.findUnique({
+    where: { id: req.adminId },
+    select: { hiddenShirtSizes: true },
+  });
+  res.json({ hiddenShirtSizes: admin?.hiddenShirtSizes ?? [] });
+});
+
+const optionsSchema = z.object({
+  hiddenShirtSizes: z.array(z.string().min(1).max(50)).max(100),
+});
+
+router.put("/me/options", requireAuth, async (req: AuthRequest, res: Response) => {
+  const parsed = optionsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const hiddenShirtSizes = [...new Set(parsed.data.hiddenShirtSizes)];
+  await prisma.admin.update({ where: { id: req.adminId }, data: { hiddenShirtSizes } });
+  res.json({ hiddenShirtSizes });
+});
+
 const paymentConfigSchema = z.object({
   clientId: z.string().min(1),
   apiKey: z.string().min(1),

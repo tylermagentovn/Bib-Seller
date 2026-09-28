@@ -27,6 +27,7 @@ import { AdminEventsPage } from "@/pages/admin/EventsPage";
 import { AdminRegistrationsPage } from "@/pages/admin/RegistrationsPage";
 import { AdminAccountsPage } from "@/pages/admin/AccountsPage";
 import { AdminSettingsPage } from "@/pages/admin/SettingsPage";
+import { AdminOptionsPage } from "@/pages/admin/OptionsPage";
 
 function RequireUser({ children }: { children: ReactNode }) {
   const { user, isLoading } = useUser();
@@ -89,6 +90,7 @@ export default function App() {
               <Route path="events" element={<AdminEventsPage />} />
               <Route path="registrations" element={<AdminRegistrationsPage />} />
               <Route path="accounts" element={<AdminAccountsPage />} />
+              <Route path="options" element={<AdminOptionsPage />} />
               <Route path="settings" element={<AdminSettingsPage />} />
             </Route>
             <Route path="/*" element={<PublicLayout />} />

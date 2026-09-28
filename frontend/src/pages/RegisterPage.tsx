@@ -163,7 +163,7 @@ function buildSchema(cfg: FieldConfig, isRelay: boolean, memberCfg: FieldConfig)
 }
 
 function MemberFieldInput({
-  def, index, register, watch, setValue, errors, show, fieldLabel,
+  def, index, register, watch, setValue, errors, show, fieldLabel, hiddenOptions,
 }: {
   def: MemberFieldDef;
   index: number;
@@ -173,8 +173,10 @@ function MemberFieldInput({
   errors: any;
   show: (key: keyof FieldConfig) => boolean;
   fieldLabel: (key: keyof FieldConfig, defaultLabel: string) => React.ReactNode;
+  hiddenOptions: string[];
 }) {
   if (!show(def.configKey)) return null;
+  const options = def.key === "shirtSize" ? def.options?.filter((o) => !hiddenOptions.includes(o)) : def.options;
   const fieldPath = `teamMembers.${index}.${def.key}`;
   const error = errors.teamMembers?.[index]?.[def.key];
 
@@ -196,7 +198,7 @@ function MemberFieldInput({
               <SelectValue placeholder={`Chọn ${def.label.toLowerCase()}`} />
             </SelectTrigger>
             <SelectContent>
-              {def.options?.map((opt) => (
+              {options?.map((opt) => (
                 <SelectItem key={opt} value={opt}>{opt}</SelectItem>
               ))}
             </SelectContent>
@@ -274,6 +276,8 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
   const cfg = (event.fieldConfig as FieldConfig) ?? {};
   const show = (key: keyof FieldConfig) => vis(cfg, key) !== "hidden";
   const isReq = (key: keyof FieldConfig) => vis(cfg, key) === "required";
+  const hiddenShirtSizes = event.hiddenShirtSizes ?? [];
+  const availableShirtSizes = SHIRT_SIZES.filter((s) => !hiddenShirtSizes.includes(s));
 
   const customDefs: CustomFieldDef[] = event.customFieldDefs ?? [];
   const [customValues, setCustomValues] = useState<Record<string, string | string[]>>({});
@@ -315,7 +319,7 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
     if (user.email) setValue("email", user.email);
     if (user.dob) setValue("dob", user.dob.slice(0, 10));
     if (user.idNumber) setValue("idNumber", user.idNumber);
-    if (user.shirtSize) setValue("shirtSize", user.shirtSize);
+    if (user.shirtSize && !hiddenShirtSizes.includes(user.shirtSize)) setValue("shirtSize", user.shirtSize);
     if (user.bloodType) setValue("bloodType", user.bloodType);
     if (user.medicalConditions) setValue("medicalConditions", user.medicalConditions);
     if (user.emergencyName) setValue("emergencyName", user.emergencyName);
@@ -511,7 +515,7 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
                     <SelectValue placeholder="Chọn size áo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SHIRT_SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {availableShirtSizes.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 {errors.shirtSize && <p className="text-xs text-red-500">{errors.shirtSize.message}</p>}
@@ -666,6 +670,7 @@ function RegisterForm({ event, user }: { event: Event; user: import("@/lib/api")
                             errors={errors}
                             show={memberShow}
                             fieldLabel={memberFieldLabel}
+                            hiddenOptions={hiddenShirtSizes}
                           />
                         ))}
                       </div>
