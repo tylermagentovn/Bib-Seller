@@ -9,6 +9,7 @@ import { Shirt, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 const SIZE_GROUPS: { title: string; sizes: string[] }[] = [
   { title: "Nam", sizes: SHIRT_SIZES.filter((s) => s.startsWith("Nam - ")) },
   { title: "Nữ", sizes: SHIRT_SIZES.filter((s) => s.startsWith("Nữ - ")) },
+  { title: "Unisex (không phân biệt nam/nữ)", sizes: SHIRT_SIZES.filter((s) => !s.includes(" - ")) },
   { title: "Trẻ em (theo chữ)", sizes: SHIRT_SIZES.filter((s) => s.startsWith("Kids - ") && isNaN(Number(s.slice(7)))) },
   { title: "Trẻ em (theo số)", sizes: SHIRT_SIZES.filter((s) => s.startsWith("Kids - ") && !isNaN(Number(s.slice(7)))) },
 ];

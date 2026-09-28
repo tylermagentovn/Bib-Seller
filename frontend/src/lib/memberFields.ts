@@ -4,8 +4,9 @@ import type { FieldConfig } from "@/lib/api";
 
 export const GENDERS = ["Nam", "Nữ", "Khác"] as const;
 export const SHIRT_SIZES = [
-  "Nam - XS", "Nam - S", "Nam - M", "Nam - L", "Nam - XL", "Nam - XXL",
-  "Nữ - XS", "Nữ - S", "Nữ - M", "Nữ - L", "Nữ - XL", "Nữ - XXL",
+  "Nam - 2XS", "Nam - XS", "Nam - S", "Nam - M", "Nam - L", "Nam - XL", "Nam - XXL",
+  "Nữ - 2XS", "Nữ - XS", "Nữ - S", "Nữ - M", "Nữ - L", "Nữ - XL", "Nữ - XXL",
+  "2XS", "XS", "S", "M", "L", "XL", "2XL",
   "Kids - XS", "Kids - S", "Kids - M", "Kids - L", "Kids - XL", "Kids - XXL",
   "Kids - 4", "Kids - 5", "Kids - 6", "Kids - 7", "Kids - 8", "Kids - 9", "Kids - 10", "Kids - 11", "Kids - 12", "Kids - 13"
 ];
