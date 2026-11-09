@@ -67,23 +67,12 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
     return;
   }
 
-  if (payment.status !== "PENDING") {
-    res.json({
-      payment,
-      checkoutUrl: payment.checkoutUrl,
-      qrCode: payment.qrCode,
-      bankBin: payment.bankBin,
-      bankAccountNumber: payment.bankAccountNumber,
-      bankAccountName: payment.bankAccountName,
-      description: (payment.qrCode ? parseQrTransferContent(payment.qrCode) : null) ?? `BIB${registrationId.slice(-6).toUpperCase()}`,
-    });
-    return;
-  }
+  // Public endpoint: never serialize the registration relation (it carries the organizer's payment keys).
+  const { registration, ...publicPayment } = payment;
 
-  // Return cached data if already created
-  if (payment.checkoutUrl && payment.payosOrderCode) {
+  if (payment.status !== "PENDING" || (payment.checkoutUrl && payment.payosOrderCode)) {
     res.json({
-      payment,
+      payment: publicPayment,
       checkoutUrl: payment.checkoutUrl,
       qrCode: payment.qrCode,
       bankBin: payment.bankBin,
@@ -95,7 +84,7 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
   }
 
   // Create PayOS payment link using event's admin credentials (or fallback)
-  const payosInstance = getPayosInstance(payment.registration.event.createdBy);
+  const payosInstance = getPayosInstance(registration.event.createdBy);
   const orderCode = Date.now();
   const description = `BIB${registrationId.slice(-6).toUpperCase()}`;
   const frontendUrl = process.env.FRONTEND_URL ?? "https://bib1s.com";
@@ -127,7 +116,7 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
   });
 
   res.json({
-    payment,
+    payment: publicPayment,
     checkoutUrl: payosRes.checkoutUrl,
     qrCode: qrCode ?? null,
     bankBin: bankBin ?? null,
