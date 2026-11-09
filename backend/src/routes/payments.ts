@@ -1,8 +1,11 @@
 import { Router, Request, Response } from "express";
+import crypto from "crypto";
 import { PayOS } from "@payos/node";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { sendConfirmationEmail, sendRegistrationSuccessEmail } from "../services/email";
 import { updateBibInSheet } from "../services/sheets";
+import { buildVietQr } from "../services/vietqr";
 
 // Global fallback PayOS instance using env vars
 const payos = new PayOS({
@@ -46,9 +49,61 @@ function parseQrTransferContent(qr: string): string | null {
   return null;
 }
 
+// No 0/O/1/I/L so the code stays unambiguous if a payer types it by hand.
+const TRANSFER_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+function generateTransferCode(): string {
+  let code = "BIB";
+  for (let i = 0; i < 8; i++) code += TRANSFER_CODE_ALPHABET[crypto.randomInt(TRANSFER_CODE_ALPHABET.length)];
+  return code;
+}
+
+// Banks may strip spaces or glue extra text onto the transfer content, so collect every overlapping candidate.
+function extractTransferCodes(text: string): string[] {
+  return [...text.toUpperCase().matchAll(/(?=(BIB[A-Z0-9]{8}))/g)].map((m) => m[1]);
+}
+
+function hasValidSepayApiKey(header: string | undefined, key: string): boolean {
+  const expected = Buffer.from(`Apikey ${key}`);
+  const received = Buffer.from(header ?? "");
+  return received.length === expected.length && crypto.timingSafeEqual(received, expected);
+}
+
+type PaidRegistration = Prisma.RegistrationGetPayload<{
+  include: { event: true; distance: true; teamMembers: true };
+}>;
+
+function notifyRegistrationPaid(reg: PaidRegistration) {
+  if (!reg.email) return;
+  const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
+  const needsContinue = reg.event.requireDisclaimer || reg.event.requireBibSpin;
+  const continueUrl = needsContinue
+    ? `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`
+    : undefined;
+  sendRegistrationSuccessEmail({
+    to: reg.email,
+    fullName: reg.fullName ?? null,
+    registrationId: reg.id,
+    eventName: reg.event.name,
+    distanceName: reg.distance.name,
+    eventDate: reg.event.eventDate ? new Date(reg.event.eventDate).toISOString().split("T")[0] : null,
+    location: reg.event.location ?? null,
+    dob: reg.dob ? reg.dob.toISOString().split("T")[0] : null,
+    phone: reg.phone ?? null,
+    idNumber: reg.idNumber ?? null,
+    shirtSize: reg.shirtSize ?? null,
+    bloodType: reg.bloodType ?? null,
+    medicalConditions: reg.medicalConditions ?? null,
+    emergencyName: reg.emergencyName ?? null,
+    emergencyPhone: reg.emergencyPhone ?? null,
+    continueUrl,
+    teamMembers: reg.teamMembers.length > 0 ? reg.teamMembers : undefined,
+  }).catch(console.error);
+}
+
 const router = Router();
 
-// Get payment info + create PayOS checkout link if needed
+// Get payment info + create the organizer's QR (SePay) or PayOS checkout link if needed
 router.get("/:registrationId", async (req: Request, res: Response) => {
   const registrationId = req.params.registrationId as string;
   const payment = await prisma.payment.findUnique({
@@ -56,7 +111,21 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
     include: {
       registration: {
         include: {
-          event: { include: { createdBy: { select: { payosClientId: true, payosApiKey: true, payosChecksumKey: true } } } },
+          event: {
+            include: {
+              createdBy: {
+                select: {
+                  payosClientId: true,
+                  payosApiKey: true,
+                  payosChecksumKey: true,
+                  paymentProvider: true,
+                  sepayBankBin: true,
+                  sepayAccountNumber: true,
+                  sepayAccountName: true,
+                },
+              },
+            },
+          },
           distance: true,
         },
       },
@@ -70,7 +139,11 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
   // Public endpoint: never serialize the registration relation (it carries the organizer's payment keys).
   const { registration, ...publicPayment } = payment;
 
-  if (payment.status !== "PENDING" || (payment.checkoutUrl && payment.payosOrderCode)) {
+  if (
+    payment.status !== "PENDING" ||
+    (payment.provider === "SEPAY" && payment.qrCode) ||
+    (payment.checkoutUrl && payment.payosOrderCode)
+  ) {
     res.json({
       payment: publicPayment,
       checkoutUrl: payment.checkoutUrl,
@@ -83,8 +156,41 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
     return;
   }
 
+  const owner = registration.event.createdBy;
+  if (owner?.paymentProvider === "SEPAY" && owner.sepayBankBin && owner.sepayAccountNumber) {
+    const transferCode = generateTransferCode();
+    // Conditional write: a concurrent request must not replace a QR the payer may already be scanning.
+    await prisma.payment.updateMany({
+      where: { id: payment.id, qrCode: null },
+      data: {
+        provider: "SEPAY",
+        transferCode,
+        qrCode: buildVietQr({
+          bin: owner.sepayBankBin,
+          accountNumber: owner.sepayAccountNumber,
+          amount: payment.amount,
+          description: transferCode,
+        }),
+        bankBin: owner.sepayBankBin,
+        bankAccountNumber: owner.sepayAccountNumber,
+        bankAccountName: owner.sepayAccountName,
+      },
+    });
+    const saved = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    res.json({
+      payment: saved,
+      checkoutUrl: null,
+      qrCode: saved.qrCode,
+      bankBin: saved.bankBin,
+      bankAccountNumber: saved.bankAccountNumber,
+      bankAccountName: saved.bankAccountName,
+      description: saved.transferCode ?? transferCode,
+    });
+    return;
+  }
+
   // Create PayOS payment link using event's admin credentials (or fallback)
-  const payosInstance = getPayosInstance(registration.event.createdBy);
+  const payosInstance = getPayosInstance(owner);
   const orderCode = Date.now();
   const description = `BIB${registrationId.slice(-6).toUpperCase()}`;
   const frontendUrl = process.env.FRONTEND_URL ?? "https://bib1s.com";
@@ -106,6 +212,7 @@ router.get("/:registrationId", async (req: Request, res: Response) => {
   await prisma.payment.update({
     where: { id: payment.id },
     data: {
+      provider: "PAYOS",
       payosOrderCode: String(orderCode),
       checkoutUrl: payosRes.checkoutUrl,
       qrCode: qrCode ?? null,
@@ -160,33 +267,7 @@ async function processPayosWebhook(payosInstance: PayOS, body: any, res: Respons
     }),
   ]);
 
-  const reg = payment.registration;
-  if (reg.email) {
-    const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
-    const needsContinue = (reg.event as any).requireDisclaimer || (reg.event as any).requireBibSpin;
-    const continueUrl = needsContinue
-      ? `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`
-      : undefined;
-    sendRegistrationSuccessEmail({
-      to: reg.email,
-      fullName: reg.fullName ?? null,
-      registrationId: reg.id,
-      eventName: reg.event.name,
-      distanceName: reg.distance.name,
-      eventDate: reg.event.eventDate ? new Date(reg.event.eventDate).toISOString().split("T")[0] : null,
-      location: reg.event.location ?? null,
-      dob: reg.dob ? reg.dob.toISOString().split("T")[0] : null,
-      phone: reg.phone ?? null,
-      idNumber: reg.idNumber ?? null,
-      shirtSize: reg.shirtSize ?? null,
-      bloodType: reg.bloodType ?? null,
-      medicalConditions: reg.medicalConditions ?? null,
-      emergencyName: reg.emergencyName ?? null,
-      emergencyPhone: reg.emergencyPhone ?? null,
-      continueUrl,
-      teamMembers: reg.teamMembers.length > 0 ? reg.teamMembers : undefined,
-    }).catch(console.error);
-  }
+  notifyRegistrationPaid(payment.registration);
 
   res.json({ success: true });
 }
@@ -288,34 +369,76 @@ router.post("/dev-confirm/:registrationId", async (req: Request, res: Response) 
     }),
   ]);
 
-  const reg = payment.registration;
-  if (reg.email) {
-    const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
-    const needsContinue = (reg.event as any).requireDisclaimer || (reg.event as any).requireBibSpin;
-    const continueUrl = needsContinue
-      ? `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`
-      : undefined;
-    sendRegistrationSuccessEmail({
-      to: reg.email,
-      fullName: reg.fullName ?? null,
-      registrationId: reg.id,
-      eventName: reg.event.name,
-      distanceName: reg.distance.name,
-      eventDate: reg.event.eventDate ? new Date(reg.event.eventDate).toISOString().split("T")[0] : null,
-      location: reg.event.location ?? null,
-      dob: reg.dob ? reg.dob.toISOString().split("T")[0] : null,
-      phone: reg.phone ?? null,
-      idNumber: reg.idNumber ?? null,
-      shirtSize: reg.shirtSize ?? null,
-      bloodType: reg.bloodType ?? null,
-      medicalConditions: reg.medicalConditions ?? null,
-      emergencyName: reg.emergencyName ?? null,
-      emergencyPhone: reg.emergencyPhone ?? null,
-      continueUrl,
-      teamMembers: reg.teamMembers.length > 0 ? reg.teamMembers : undefined,
-    }).catch(console.error);
+  notifyRegistrationPaid(payment.registration);
+
+  res.json({ success: true });
+});
+
+// SePay bank-transfer webhook, one URL per organizer (each has its own API key and bank account).
+router.post("/webhook/sepay/:adminId", async (req: Request, res: Response) => {
+  const adminId = String(req.params.adminId);
+  const admin = await prisma.admin.findUnique({
+    where: { id: adminId },
+    select: { sepayWebhookKey: true, sepayAccountNumber: true },
+  });
+  if (!admin?.sepayWebhookKey || !hasValidSepayApiKey(req.headers.authorization, admin.sepayWebhookKey)) {
+    res.status(401).json({ success: false, error: "Unauthorized" });
+    return;
   }
 
+  // Unmatched or ignored transactions are still acknowledged: SePay retrying them cannot change the outcome.
+  const tx = req.body ?? {};
+  const txId = String(tx.id ?? "");
+  const amount = Number(tx.transferAmount);
+  if (tx.transferType !== "in" || !txId || !Number.isFinite(amount)) {
+    res.json({ success: true });
+    return;
+  }
+
+  // Only money that reached this organizer's own account can confirm their registrations.
+  const receivingAccounts = [tx.accountNumber, tx.subAccount].filter(Boolean).map(String);
+  if (!admin.sepayAccountNumber || !receivingAccounts.includes(admin.sepayAccountNumber)) {
+    console.warn(`SePay webhook (admin ${adminId}): tx ${txId} went to another account, ignored`);
+    res.json({ success: true });
+    return;
+  }
+
+  const codes = extractTransferCodes(`${tx.code ?? ""} ${tx.content ?? ""}`);
+  const payment = codes.length === 0 ? null : await prisma.payment.findFirst({
+    where: { transferCode: { in: codes }, provider: "SEPAY", registration: { event: { createdById: adminId } } },
+    include: { registration: { include: { event: true, distance: true, teamMembers: { orderBy: { memberIndex: "asc" } } } } },
+  });
+  if (!payment) {
+    console.warn(`SePay webhook (admin ${adminId}): tx ${txId} matched no payment, content="${tx.content}" amount=${amount}`);
+    res.json({ success: true });
+    return;
+  }
+  if (payment.status === "PAID") {
+    res.json({ success: true });
+    return;
+  }
+  if (amount < payment.amount) {
+    console.warn(`SePay webhook: tx ${txId} underpaid registration ${payment.registrationId} (${amount} < ${payment.amount})`);
+    res.json({ success: true });
+    return;
+  }
+
+  // A transfer can land after the expiry cron cancelled the registration; the money arrived, so accept it.
+  const wasExpired = payment.status === "EXPIRED";
+  const transitioned = await prisma.$transaction(async (db) => {
+    const { count } = await db.payment.updateMany({
+      where: { id: payment.id, status: { not: "PAID" } },
+      data: { status: "PAID", paidAt: new Date(), sepayTransactionId: txId },
+    });
+    if (count === 0) return false;
+    await db.registration.update({ where: { id: payment.registrationId }, data: { status: "PAID" } });
+    return true;
+  });
+
+  if (transitioned) {
+    if (wasExpired) console.warn(`SePay webhook: late payment accepted for registration ${payment.registrationId}`);
+    notifyRegistrationPaid(payment.registration);
+  }
   res.json({ success: true });
 });
 

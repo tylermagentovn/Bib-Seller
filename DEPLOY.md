@@ -82,13 +82,6 @@ JWT_SECRET="hkvihXbc1w3oagoscr4YaWkETcoLd8VBD6UxD329x1O"
 PORT=3001
 NODE_ENV=production
 
-# SePay
-SEPAY_API_TOKEN=
-SEPAY_BANK_ACCOUNT=
-SEPAY_BANK_NAME=
-SEPAY_ACCOUNT_NAME=
-SEPAY_WEBHOOK_SECRET=
-
 # PayOS
 PAYOS_CLIENT_ID=""
 PAYOS_API_KEY=""
@@ -214,13 +207,16 @@ sudo certbot renew --dry-run
 
 ---
 
-## 9. Cấu hình SePay Webhook
+## 9. Cấu hình SePay (tùy chọn, theo từng người tổ chức)
 
-Trong dashboard SePay, thiết lập webhook URL:
+SePay không dùng biến môi trường. Mỗi người tổ chức tự cấu hình trong **Admin → Cài đặt → Chuyển khoản qua SePay**
+(ngân hàng, số tài khoản, chủ tài khoản), rồi trong dashboard SePay tạo webhook với:
 
-```
-https://yourdomain.com/api/payments/webhook/sepay
-```
+- URL: `https://yourdomain.com/api/payments/webhook/sepay/<adminId>` (copy từ trang Cài đặt)
+- Kiểu chứng thực: **API Key**, dán API Key hiển thị ở trang Cài đặt
+- Content type: `application/json`, sự kiện: có tiền vào
+
+Sau đó chọn **SePay** ở mục "Cổng thanh toán đang dùng".
 
 ---
 

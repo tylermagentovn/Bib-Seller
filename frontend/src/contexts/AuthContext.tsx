@@ -9,6 +9,8 @@ interface Admin {
   name: string;
   role: AdminRole;
   hasPaymentConfig?: boolean;
+  hasSepayConfig?: boolean;
+  paymentProvider?: "PAYOS" | "SEPAY";
 }
 
 interface AuthContextValue {

@@ -6,30 +6,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { Loader2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
+import { getBankName } from "@/lib/banks";
 
 const IS_DEV = import.meta.env.DEV;
-
-const BANK_NAMES: Record<string, string> = {
-  "970422": "MBBank",
-  "970436": "Vietcombank",
-  "970418": "BIDV",
-  "970415": "VietinBank",
-  "970405": "Agribank",
-  "970407": "Techcombank",
-  "970416": "ACB",
-  "970432": "VPBank",
-  "970423": "TPBank",
-  "970400": "SacomBank",
-  "970403": "Saigonbank",
-  "970443": "SHB",
-  "970437": "HDBank",
-  "970454": "VietCapital Bank",
-  "970301": "VietBank",
-};
-
-function getBankName(bin: string): string {
-  return BANK_NAMES[bin] ?? `BIN ${bin}`;
-}
 
 export function PaymentPage() {
   const { id } = useParams<{ id: string }>();

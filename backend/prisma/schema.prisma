@@ -19,6 +19,12 @@ model Admin {
   payosApiKey      String?
   payosChecksumKey String?
 
+  paymentProvider    PaymentProvider @default(PAYOS)
+  sepayBankBin       String?
+  sepayAccountNumber String?
+  sepayAccountName   String?
+  sepayWebhookKey    String?
+
   hiddenShirtSizes String[] @default([])
 
   events Event[]
@@ -167,6 +173,9 @@ model Payment {
   bankAccountNumber String?
   bankAccountName   String?
   payosRef          String?
+  provider           PaymentProvider?
+  transferCode       String?          @unique
+  sepayTransactionId String?          @unique
   status         PaymentStatus @default(PENDING)
   paidAt         DateTime?
   expiresAt      DateTime
@@ -241,4 +250,9 @@ enum PaymentStatus {
   PENDING
   PAID
   EXPIRED
+}
+
+enum PaymentProvider {
+  PAYOS
+  SEPAY
 }

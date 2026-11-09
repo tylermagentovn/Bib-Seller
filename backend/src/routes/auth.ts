@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
@@ -44,13 +45,14 @@ router.post("/login", async (req: Request, res: Response) => {
 router.get("/me", requireAuth, async (req: AuthRequest, res: Response) => {
   const admin = await prisma.admin.findUnique({
     where: { id: req.adminId },
-    select: { id: true, email: true, name: true, role: true, payosClientId: true },
+    select: { id: true, email: true, name: true, role: true, payosClientId: true, paymentProvider: true, sepayAccountNumber: true },
   });
   if (!admin) {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  res.json({ ...admin, hasPaymentConfig: !!admin.payosClientId, payosClientId: undefined });
+  const { payosClientId, sepayAccountNumber, ...rest } = admin;
+  res.json({ ...rest, hasPaymentConfig: !!payosClientId, hasSepayConfig: !!sepayAccountNumber });
 });
 
 const createAdminSchema = z.object({
@@ -145,6 +147,108 @@ router.put("/me/options", requireAuth, async (req: AuthRequest, res: Response) =
   const hiddenShirtSizes = [...new Set(parsed.data.hiddenShirtSizes)];
   await prisma.admin.update({ where: { id: req.adminId }, data: { hiddenShirtSizes } });
   res.json({ hiddenShirtSizes });
+});
+
+const sepayConfigSelect = {
+  paymentProvider: true,
+  sepayBankBin: true,
+  sepayAccountNumber: true,
+  sepayAccountName: true,
+  sepayWebhookKey: true,
+} as const;
+
+function sepayConfigResponse(admin: {
+  paymentProvider: "PAYOS" | "SEPAY";
+  sepayBankBin: string | null;
+  sepayAccountNumber: string | null;
+  sepayAccountName: string | null;
+  sepayWebhookKey: string | null;
+}) {
+  return {
+    paymentProvider: admin.paymentProvider,
+    bankBin: admin.sepayBankBin,
+    accountNumber: admin.sepayAccountNumber,
+    accountName: admin.sepayAccountName,
+    webhookKey: admin.sepayWebhookKey,
+  };
+}
+
+const newWebhookKey = () => crypto.randomBytes(24).toString("hex");
+
+router.get("/me/sepay-config", requireAuth, async (req: AuthRequest, res: Response) => {
+  const admin = await prisma.admin.findUniqueOrThrow({ where: { id: req.adminId }, select: sepayConfigSelect });
+  res.json(sepayConfigResponse(admin));
+});
+
+const sepayConfigSchema = z.object({
+  bankBin: z.string().regex(/^\d{6}$/),
+  // VietQR caps the beneficiary account field at 19 characters.
+  accountNumber: z.string().trim().regex(/^[A-Za-z0-9]{1,19}$/),
+  accountName: z.string().trim().min(1).max(100),
+});
+
+router.put("/me/sepay-config", requireAuth, async (req: AuthRequest, res: Response) => {
+  const parsed = sepayConfigSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const current = await prisma.admin.findUniqueOrThrow({ where: { id: req.adminId }, select: { sepayWebhookKey: true } });
+  const admin = await prisma.admin.update({
+    where: { id: req.adminId },
+    data: {
+      sepayBankBin: parsed.data.bankBin,
+      sepayAccountNumber: parsed.data.accountNumber,
+      sepayAccountName: parsed.data.accountName,
+      sepayWebhookKey: current.sepayWebhookKey ?? newWebhookKey(),
+    },
+    select: sepayConfigSelect,
+  });
+  res.json(sepayConfigResponse(admin));
+});
+
+router.post("/me/sepay-config/rotate-key", requireAuth, async (req: AuthRequest, res: Response) => {
+  const admin = await prisma.admin.update({
+    where: { id: req.adminId },
+    data: { sepayWebhookKey: newWebhookKey() },
+    select: sepayConfigSelect,
+  });
+  res.json(sepayConfigResponse(admin));
+});
+
+router.delete("/me/sepay-config", requireAuth, async (req: AuthRequest, res: Response) => {
+  await prisma.admin.update({
+    where: { id: req.adminId },
+    data: {
+      paymentProvider: "PAYOS",
+      sepayBankBin: null,
+      sepayAccountNumber: null,
+      sepayAccountName: null,
+      sepayWebhookKey: null,
+    },
+  });
+  res.status(204).send();
+});
+
+router.put("/me/payment-provider", requireAuth, async (req: AuthRequest, res: Response) => {
+  const parsed = z.object({ provider: z.enum(["PAYOS", "SEPAY"]) }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  if (parsed.data.provider === "SEPAY") {
+    const admin = await prisma.admin.findUniqueOrThrow({ where: { id: req.adminId }, select: sepayConfigSelect });
+    if (!admin.sepayBankBin || !admin.sepayAccountNumber || !admin.sepayWebhookKey) {
+      res.status(400).json({ error: "Cần lưu cấu hình SePay trước khi chọn SePay" });
+      return;
+    }
+  }
+  const admin = await prisma.admin.update({
+    where: { id: req.adminId },
+    data: { paymentProvider: parsed.data.provider },
+    select: sepayConfigSelect,
+  });
+  res.json(sepayConfigResponse(admin));
 });
 
 const paymentConfigSchema = z.object({
