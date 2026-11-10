@@ -6,6 +6,7 @@ import { requireAuth, AuthRequest } from "../middleware/auth";
 import { optionalUserAuth, UserRequest } from "../middleware/userAuth";
 import { appendRegistrationToSheet } from "../services/sheets";
 import { sendRegistrationSuccessEmail } from "../services/email";
+import { sendBibConfirmationEmail, sendPaidRegistrationEmail } from "../services/registrationEmails";
 
 const router = Router();
 
@@ -609,6 +610,50 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 
   res.json(updated);
+});
+
+// Admin: resend the confirmation email (BIB confirmation once a BIB exists, otherwise payment success)
+router.post("/:id/resend-email", requireAuth, async (req: AuthRequest, res: Response) => {
+  const registration = await prisma.registration.findUnique({
+    where: { id: req.params.id as string },
+    include: {
+      event: true,
+      distance: true,
+      teamMembers: { orderBy: { memberIndex: "asc" } },
+      customFieldValues: { include: { fieldDef: true } },
+    },
+  });
+  if (!registration) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (req.adminRole === "EVENT_MANAGER" && registration.event.createdById !== req.adminId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  if (registration.status !== "PAID") {
+    res.status(400).json({ error: "Chỉ gửi lại email cho đăng ký đã thanh toán" });
+    return;
+  }
+  const { email, bibNumber } = registration;
+  if (!email) {
+    res.status(400).json({ error: "Đăng ký không có email" });
+    return;
+  }
+
+  try {
+    if (bibNumber !== null) {
+      await sendBibConfirmationEmail({ ...registration, email, bibNumber });
+    } else {
+      await sendPaidRegistrationEmail({ ...registration, email });
+    }
+  } catch (err) {
+    console.error(`Resend email failed for registration ${registration.id}:`, err);
+    res.status(502).json({ error: "Gửi email thất bại, vui lòng thử lại sau" });
+    return;
+  }
+
+  res.json({ sentTo: email, type: bibNumber !== null ? "BIB_CONFIRMATION" : "PAYMENT_SUCCESS" });
 });
 
 // Admin: delete registration

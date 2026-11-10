@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { api, type Registration, type TeamMember, type CustomFieldDef } from "@/lib/api";
 import { MEMBER_FIELD_DEFS, GENDERS, SHIRT_SIZES, BLOOD_TYPES, COUNTRIES, initFieldValue, normalizeFieldValue } from "@/lib/memberFields";
 import { formatDate, formatCurrency } from "@/lib/utils";
@@ -11,7 +12,7 @@ import {
   Loader2, Pencil, ChevronLeft, ChevronRight, Search,
   X, User, Phone, Mail, Calendar, Shield, CreditCard, CircleUser,
   PenLine, Users, CheckCircle, Clock, Download, Trash2, RefreshCw,
-  BadgeCheck, Shirt, Droplets, HeartPulse, MapPin, Globe,
+  BadgeCheck, Shirt, Droplets, HeartPulse, MapPin, Globe, Send,
 } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -497,6 +498,11 @@ function DetailModal({ reg, onClose, onEditBib, onEditStatus, onEditInfo }: {
     return <Badge variant="warning">Chờ</Badge>;
   };
 
+  const resendMutation = useMutation({
+    mutationFn: () =>
+      api.post<{ sentTo: string }>(`/registrations/${reg.id}/resend-email`).then((r) => r.data),
+  });
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex justify-end" onClick={onClose}>
       <div
@@ -588,6 +594,33 @@ function DetailModal({ reg, onClose, onEditBib, onEditStatus, onEditInfo }: {
                     <span className="text-gray-500">Email</span>
                     <span className="font-medium text-right break-all max-w-[60%]">{reg.email}</span>
                   </div>
+                </div>
+              )}
+              {reg.status === "PAID" && reg.email && (
+                <div className="flex items-center justify-between gap-3 pl-6.5">
+                  <span className="text-xs">
+                    {resendMutation.isSuccess ? (
+                      <span className="text-emerald-600">Đã gửi lại tới {resendMutation.data.sentTo}</span>
+                    ) : resendMutation.isError ? (
+                      <span className="text-red-500">
+                        {(isAxiosError(resendMutation.error) && resendMutation.error.response?.data?.error) || "Gửi email thất bại"}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">
+                        {reg.bibNumber ? "Email xác nhận BIB" : "Email thanh toán thành công"}
+                      </span>
+                    )}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs shrink-0"
+                    disabled={resendMutation.isPending}
+                    onClick={() => confirm(`Gửi lại email xác nhận tới ${reg.email}?`) && resendMutation.mutate()}
+                  >
+                    {resendMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Send className="h-3.5 w-3.5 mr-1" />}
+                    Gửi lại email
+                  </Button>
                 </div>
               )}
               {reg.gender != null && (

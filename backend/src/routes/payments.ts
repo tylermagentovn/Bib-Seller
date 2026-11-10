@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { PayOS } from "@payos/node";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
-import { sendConfirmationEmail, sendRegistrationSuccessEmail } from "../services/email";
+import { sendBibConfirmationEmail, sendPaidRegistrationEmail } from "../services/registrationEmails";
 import { updateBibInSheet } from "../services/sheets";
 import { buildVietQr } from "../services/vietqr";
 
@@ -75,30 +75,7 @@ type PaidRegistration = Prisma.RegistrationGetPayload<{
 
 function notifyRegistrationPaid(reg: PaidRegistration) {
   if (!reg.email) return;
-  const frontend = process.env.FRONTEND_URL ?? "http://localhost:5173";
-  const needsContinue = reg.event.requireDisclaimer || reg.event.requireBibSpin;
-  const continueUrl = needsContinue
-    ? `${frontend.replace(/\/$/, "")}/payment/${reg.id}/success?step=waiver`
-    : undefined;
-  sendRegistrationSuccessEmail({
-    to: reg.email,
-    fullName: reg.fullName ?? null,
-    registrationId: reg.id,
-    eventName: reg.event.name,
-    distanceName: reg.distance.name,
-    eventDate: reg.event.eventDate ? new Date(reg.event.eventDate).toISOString().split("T")[0] : null,
-    location: reg.event.location ?? null,
-    dob: reg.dob ? reg.dob.toISOString().split("T")[0] : null,
-    phone: reg.phone ?? null,
-    idNumber: reg.idNumber ?? null,
-    shirtSize: reg.shirtSize ?? null,
-    bloodType: reg.bloodType ?? null,
-    medicalConditions: reg.medicalConditions ?? null,
-    emergencyName: reg.emergencyName ?? null,
-    emergencyPhone: reg.emergencyPhone ?? null,
-    continueUrl,
-    teamMembers: reg.teamMembers.length > 0 ? reg.teamMembers : undefined,
-  }).catch(console.error);
+  sendPaidRegistrationEmail({ ...reg, email: reg.email }).catch(console.error);
 }
 
 const router = Router();
@@ -529,25 +506,7 @@ router.post("/bib/confirm/:registrationId", async (req: Request, res: Response) 
   });
 
   if (registration.email) {
-    sendConfirmationEmail({
-      to: registration.email,
-      fullName: registration.fullName ?? null,
-      eventName: updated.event.name,
-      distanceName: updated.distance.name,
-      bibNumber,
-      registrationId: registration.id,
-      eventDate: updated.event.eventDate?.toLocaleDateString("vi-VN") ?? null,
-      location: updated.event.location ?? null,
-      phone: registration.phone ?? null,
-      dob: registration.dob?.toLocaleDateString("vi-VN") ?? null,
-      idNumber: registration.idNumber ?? null,
-      shirtSize: registration.shirtSize ?? null,
-      bloodType: registration.bloodType ?? null,
-      medicalConditions: registration.medicalConditions ?? null,
-      emergencyName: registration.emergencyName ?? null,
-      emergencyPhone: registration.emergencyPhone ?? null,
-      teamMembers: registration.teamMembers.length > 0 ? registration.teamMembers : undefined,
-    }).catch(console.error);
+    sendBibConfirmationEmail({ ...registration, email: registration.email, bibNumber }).catch(console.error);
   }
 
   updateBibInSheet(registration.id, bibNumber).catch(console.error);
